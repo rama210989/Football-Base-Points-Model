@@ -1,42 +1,42 @@
 import streamlit as st
 import pandas as pd
-import requests
+import os
 
-# Hardcoded Premier League teams with fbref URLs
-team_urls = {
-    "Arsenal": "https://fbref.com/en/squads/18bb7c10/2024-2025/Arsenal-Stats",
-    "Aston Villa": "https://fbref.com/en/squads/8602292d/2024-2025/Aston-Villa-Stats",
-    "Bournemouth": "https://fbref.com/en/squads/bffc15f4/2024-2025/Bournemouth-Stats",
-    "Brentford": "https://fbref.com/en/squads/7c21e445/2024-2025/Brentford-Stats",
-    "Brighton": "https://fbref.com/en/squads/bd87cffa/2024-2025/Brighton-and-Hove-Albion-Stats",
-    "Chelsea": "https://fbref.com/en/squads/cff3d9bb/2024-2025/Chelsea-Stats",
-    "Crystal Palace": "https://fbref.com/en/squads/47c64c55/2024-2025/Crystal-Palace-Stats",
-    "Everton": "https://fbref.com/en/squads/7c21e445/2024-2025/Everton-Stats",
-    "Fulham": "https://fbref.com/en/squads/3fab645c/2024-2025/Fulham-Stats",
-    "Leeds United": "https://fbref.com/en/squads/2a89072c/2024-2025/Leeds-United-Stats",
-    "Leicester City": "https://fbref.com/en/squads/8656c477/2024-2025/Leicester-City-Stats",
-    "Liverpool": "https://fbref.com/en/squads/822bd0ba/2024-2025/Liverpool-Stats",
-    "Manchester City": "https://fbref.com/en/squads/b8fd03ef/2024-2025/Manchester-City-Stats",
-    "Manchester United": "https://fbref.com/en/squads/19538871/2024-2025/Manchester-United-Stats",
-    "Newcastle United": "https://fbref.com/en/squads/b2b47a98/2024-2025/Newcastle-United-Stats",
-    "Nottingham Forest": "https://fbref.com/en/squads/1c781004/2024-2025/Nottingham-Forest-Stats",
-    "Southampton": "https://fbref.com/en/squads/5c95d9f7/2024-2025/Southampton-Stats",
-    "Tottenham Hotspur": "https://fbref.com/en/squads/361ca564/2024-2025/Tottenham-Hotspur-Stats",
-    "West Ham United": "https://fbref.com/en/squads/1a2dee49/2024-2025/West-Ham-United-Stats",
-    "Wolverhampton Wanderers": "https://fbref.com/en/squads/19538871/2024-2025/Wolverhampton-Wanderers-Stats",
+# Folder where HTML files are saved
+HTML_FOLDER = "html"
+
+team_files = {
+    "Arsenal": "Arsenal.html",
+    "Aston Villa": "Aston_Villa.html",
+    "Bournemouth": "Bournemouth.html",
+    "Brentford": "Brentford.html",
+    "Brighton": "Brighton.html",
+    "Chelsea": "Chelsea.html",
+    "Crystal Palace": "Crystal_Palace.html",
+    "Everton": "Everton.html",
+    "Fulham": "Fulham.html",
+    "Leeds United": "Leeds_United.html",
+    "Leicester City": "Leicester_City.html",
+    "Liverpool": "Liverpool.html",
+    "Manchester City": "Manchester_City.html",
+    "Manchester United": "Manchester_United.html",
+    "Newcastle United": "Newcastle_United.html",
+    "Nottingham Forest": "Nottingham_Forest.html",
+    "Southampton": "Southampton.html",
+    "Tottenham Hotspur": "Tottenham_Hotspur.html",
+    "West Ham United": "West_Ham_United.html",
+    "Wolverhampton Wanderers": "Wolverhampton_Wanderers.html",
 }
 
-def load_team_data(url):
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) '
-                      'Chrome/114.0.0.0 Safari/537.36'
-    }
-    response = requests.get(url, headers=headers)
-    response.raise_for_status()
-    html = response.text
+def load_team_data_from_file(filename):
+    filepath = os.path.join(HTML_FOLDER, filename)
+    if not os.path.exists(filepath):
+        st.error(f"Data file not found: {filepath}. Please run download_teams_html.py first.")
+        return None
 
-    tables = pd.read_html(html)
+    tables = pd.read_html(filepath)
 
+    # Same processing logic as before
     df_basic = tables[0]
     df_basic.columns = [' '.join(col).strip() for col in df_basic.columns.values]
     df_basic = df_basic[df_basic['Unnamed: 0_level_0 Player'] != 'Player']
@@ -99,12 +99,11 @@ def load_team_data(url):
     df_all = df_all.merge(df_gk[['Player', 'Saves', 'Goals_Against']], on='Player', how='left')
     df_all.fillna(0, inplace=True)
 
-    # Convert numeric columns explicitly to avoid issues
     for col in ['Matches', 'Starts', 'YC', 'RC', 'OG', 'Passes_Completed', 'Chance_Created',
                 'Shots_on_Target', 'Tackles_Won', 'Interceptions', 'Saves', 'Goals_Against']:
         df_all[col] = pd.to_numeric(df_all[col], errors='coerce').fillna(0)
 
-    df_all['Team'] = url.split('/')[-2]
+    df_all['Team'] = filename.replace(".html", "").replace("_", " ")
     return df_all
 
 def calc_points(row):
@@ -172,21 +171,20 @@ def select_best_11(df):
 
     selected_df = pd.DataFrame(selected)
 
-    # TODO: Implement minimum checks and fill if needed
-
     return selected_df[['Player', 'Pos', 'Team', 'Points']]
 
 st.title("Premier League Dream11 Best Playing 11 Selector")
 
-teams = list(team_urls.keys())
+teams = list(team_files.keys())
 
 team1 = st.selectbox("Select Team 1", teams)
 team2 = st.selectbox("Select Team 2", teams)
 
 if st.button("Select Best Playing 11"):
     with st.spinner('Loading and processing data...'):
-        df1 = load_team_data(team_urls[team1])
-        df2 = load_team_data(team_urls[team2])
-        df_all = pd.concat([df1, df2], ignore_index=True)
-        best11 = select_best_11(df_all)
-        st.table(best11)
+        df1 = load_team_data_from_file(team_files[team1])
+        df2 = load_team_data_from_file(team_files[team2])
+        if df1 is not None and df2 is not None:
+            df_all = pd.concat([df1, df2], ignore_index=True)
+            best11 = select_best_11(df_all)
+            st.table(best11)
