@@ -28,8 +28,8 @@ team_urls = {
 
 def load_team_data(url):
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)'
-                      ' Chrome/114.0.0.0 Safari/537.36'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) '
+                      'Chrome/114.0.0.0 Safari/537.36'
     }
     response = requests.get(url, headers=headers)
     response.raise_for_status()
@@ -37,7 +37,6 @@ def load_team_data(url):
 
     tables = pd.read_html(html)
 
-    # Processing tables as before
     df_basic = tables[0]
     df_basic.columns = [' '.join(col).strip() for col in df_basic.columns.values]
     df_basic = df_basic[df_basic['Unnamed: 0_level_0 Player'] != 'Player']
@@ -99,24 +98,30 @@ def load_team_data(url):
     df_all = df_all.merge(df_def_misc[['Player', 'Interceptions', 'Tackles_Won']], on='Player', how='left')
     df_all = df_all.merge(df_gk[['Player', 'Saves', 'Goals_Against']], on='Player', how='left')
     df_all.fillna(0, inplace=True)
+
+    # Convert numeric columns explicitly to avoid issues
+    for col in ['Matches', 'Starts', 'YC', 'RC', 'OG', 'Passes_Completed', 'Chance_Created',
+                'Shots_on_Target', 'Tackles_Won', 'Interceptions', 'Saves', 'Goals_Against']:
+        df_all[col] = pd.to_numeric(df_all[col], errors='coerce').fillna(0)
+
     df_all['Team'] = url.split('/')[-2]
     return df_all
 
 def calc_points(row):
     points = 0
-    points += row['Chance_Created'] * 3
-    points += row['Shots_on_Target'] * 6
-    points += (row['Passes_Completed'] // 5) * 1
-    points += row['Tackles_Won'] * 4
-    points += row['Interceptions'] * 4
-    points += row['Saves'] * 6
-    points += (row['Starts'] > 0) * 4
-    points += (row['Matches'] - row['Starts']) * 2
-    points -= row['YC'] * 4
-    points -= row['RC'] * 10
-    points -= row['OG'] * 8
-    if row['Pos'] in ['GK', 'DF']:
-        points -= row['Goals_Against'] * 2
+    points += row.get('Chance_Created', 0) * 3
+    points += row.get('Shots_on_Target', 0) * 6
+    points += (row.get('Passes_Completed', 0) // 5) * 1
+    points += row.get('Tackles_Won', 0) * 4
+    points += row.get('Interceptions', 0) * 4
+    points += row.get('Saves', 0) * 6
+    points += (row.get('Starts', 0) > 0) * 4
+    points += (row.get('Matches', 0) - row.get('Starts', 0)) * 2
+    points -= row.get('YC', 0) * 4
+    points -= row.get('RC', 0) * 10
+    points -= row.get('OG', 0) * 8
+    if row.get('Pos') in ['GK', 'DF']:
+        points -= row.get('Goals_Against', 0) * 2
     return points
 
 def select_best_11(df):
@@ -128,7 +133,7 @@ def select_best_11(df):
     pos_count = {'GK':0, 'DF':0, 'MF':0, 'FW':0}
 
     def pos_key(pos):
-        pos = pos.upper()
+        pos = str(pos).upper()
         if 'GK' in pos:
             return 'GK'
         elif 'DF' in pos:
