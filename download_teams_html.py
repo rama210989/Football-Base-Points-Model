@@ -1,5 +1,20 @@
+# download_teams_html.py
+
 import os
-import requests
+import time
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
+
+# Setup headless Chrome options
+chrome_options = Options()
+chrome_options.add_argument("--headless=new")
+chrome_options.add_argument("--no-sandbox")
+chrome_options.add_argument("--disable-dev-shm-usage")
+chrome_options.binary_location = "/usr/local/bin/chrome/chrome"
+
+service = Service("/usr/local/bin/chromedriver")
+driver = webdriver.Chrome(service=service, options=chrome_options)
 
 team_urls = {
     "Arsenal": "https://fbref.com/en/squads/18bb7c10/2024-2025/Arsenal-Stats",
@@ -24,30 +39,18 @@ team_urls = {
     "Wolverhampton Wanderers": "https://fbref.com/en/squads/19538871/2024-2025/Wolverhampton-Wanderers-Stats",
 }
 
-headers = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
-                  '(KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
-    'Accept-Language': 'en-US,en;q=0.9',
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
-    'Referer': 'https://fbref.com/',
-    'Connection': 'keep-alive',
-}
-
-
 output_folder = "html"
 os.makedirs(output_folder, exist_ok=True)
 
 for team, url in team_urls.items():
-    print(f"Downloading {team} page...")
-    try:
-        response = requests.get(url, headers=headers)
-        response.raise_for_status()
-        filename = f"{output_folder}/{team.replace(' ', '_')}.html"
-        with open(filename, 'w', encoding='utf-8') as f:
-            f.write(response.text)
-        print(f"Saved {filename}")
-    except Exception as e:
-        print(f"Error downloading {team}: {e}")
+    print(f"📥 Downloading {team} page...")
+    driver.get(url)
+    time.sleep(3)
+    html = driver.page_source
+    filename = f"{output_folder}/{team.replace(' ', '_')}.html"
+    with open(filename, "w", encoding="utf-8") as f:
+        f.write(html)
+    print(f"✅ Saved {filename}")
 
-print("Download complete!")
-
+driver.quit()
+print("🎉 All team pages downloaded.")
