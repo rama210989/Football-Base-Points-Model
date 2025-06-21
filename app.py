@@ -27,12 +27,17 @@ team_urls = {
 }
 
 def load_team_data(url):
-    tables = pd.read_html(url)
-    # Your existing code to process tables, merge, rename columns
-    # Extract the same columns needed for point calculation
-    
-    # For brevity, I'll add a simplified loader here; you can expand with your previous code.
-    
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)'
+                      ' Chrome/114.0.0.0 Safari/537.36'
+    }
+    response = requests.get(url, headers=headers)
+    response.raise_for_status()
+    html = response.text
+
+    tables = pd.read_html(html)
+
+    # Processing tables as before
     df_basic = tables[0]
     df_basic.columns = [' '.join(col).strip() for col in df_basic.columns.values]
     df_basic = df_basic[df_basic['Unnamed: 0_level_0 Player'] != 'Player']
@@ -94,7 +99,7 @@ def load_team_data(url):
     df_all = df_all.merge(df_def_misc[['Player', 'Interceptions', 'Tackles_Won']], on='Player', how='left')
     df_all = df_all.merge(df_gk[['Player', 'Saves', 'Goals_Against']], on='Player', how='left')
     df_all.fillna(0, inplace=True)
-    df_all['Team'] = url.split('/')[-2]  # Add team identifier for selection rules
+    df_all['Team'] = url.split('/')[-2]
     return df_all
 
 def calc_points(row):
@@ -116,14 +121,12 @@ def calc_points(row):
 
 def select_best_11(df):
     df['Points'] = df.apply(calc_points, axis=1)
-    # Sort descending by points
     df = df.sort_values(by='Points', ascending=False)
 
     selected = []
     count_team = {}
     pos_count = {'GK':0, 'DF':0, 'MF':0, 'FW':0}
 
-    # Helper to parse position into GK, DF, MF, FW (handle MF,FW etc)
     def pos_key(pos):
         pos = pos.upper()
         if 'GK' in pos:
@@ -140,18 +143,15 @@ def select_best_11(df):
     for idx, row in df.iterrows():
         if len(selected) == 11:
             break
-
         team = row['Team']
         pos = pos_key(row['Pos'])
         if pos is None:
             continue
 
-        # Check team constraints
+        # Max constraints
         team_ct = count_team.get(team, 0)
         if team_ct >= 7:
             continue
-
-        # Check position max constraints
         if pos == 'GK' and pos_count['GK'] >= 1:
             continue
         if pos == 'DF' and pos_count['DF'] >= 5:
@@ -165,15 +165,9 @@ def select_best_11(df):
         count_team[team] = team_ct + 1
         pos_count[pos] += 1
 
-    # After picking top 11 respecting max, check if minimums met, else fill:
-    # GK min 1, DF min 3, MF min 3, FW min 1
-    # If not, pick from remaining players fulfilling mins and max team limits
-
-    # Convert to DataFrame
     selected_df = pd.DataFrame(selected)
 
-    # If any minimum not met, fill from remaining players (lower points)
-    # (Implementation left to you for simplicity or I can help)
+    # TODO: Implement minimum checks and fill if needed
 
     return selected_df[['Player', 'Pos', 'Team', 'Points']]
 
