@@ -1,6 +1,5 @@
+# Ignore HTML files if you want
+html/
 __pycache__/
 *.pyc
-.ipynb_checkpoints/
 .env
-.venv
-
