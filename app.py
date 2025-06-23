@@ -168,7 +168,7 @@ def select_best_xi(df1, df2):
 
 # Streamlit UI
 st.set_page_config(layout="wide")
-st.title("🏆 Dream11 Best 15 Generator (Premier League)")
+st.title("🏆 Dream11 Base Point Generator (Premier League)")
 
 col1, col2 = st.columns(2)
 
