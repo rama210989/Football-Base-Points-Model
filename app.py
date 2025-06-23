@@ -208,6 +208,18 @@ def select_best_xi(df1, df2):
 
     return pd.DataFrame(best11)
 
+# Helper function: add emoji suffix and keep only surname for compact display
+def add_emoji_to_name(row):
+    pos_icons = {
+        'GK': '🧤',
+        'DF': '🤼',
+        'MF': '👟',
+        'FWD': '⚽',
+    }
+    surname = row['Player'].split()[-1]
+    emoji = pos_icons.get(row['Pos'], '')
+    return f"{surname} {emoji}"
+
 # Streamlit UI
 st.set_page_config(layout="wide")
 st.title("🏆 Dream11 Base Point Generator (Premier League)")
@@ -235,7 +247,7 @@ with tab2:
     if 'team2_df' in st.session_state:
         st.subheader(f"🔵 Top 15 - {st.session_state['team2_name']}")
         display_player_cards(st.session_state['team2_df'].head(15), "#e6f0ff")
-        
+
 with tab3:
     if 'team1_df' in st.session_state and 'team2_df' in st.session_state:
         if st.button("⚔️ Generate Best Combined XI"):
@@ -243,13 +255,16 @@ with tab3:
             if 'Error' in combined.columns:
                 st.error(combined.iloc[0]['Error'])
             else:
+                combined['PlayerWithEmoji'] = combined.apply(add_emoji_to_name, axis=1)
                 combined['TeamColor'] = combined['Team'].apply(
                     lambda x: '🔴 ' + x if x == st.session_state['team1_name'] else '🔵 ' + x
                 )
                 st.subheader("💥 Best Combined XI")
-                st.dataframe(combined[['Player', 'TeamColor', 'Pos', 'Dream11_Points']].rename(columns={'TeamColor': 'Team'}))
+                st.dataframe(
+                    combined[['PlayerWithEmoji', 'TeamColor', 'Pos', 'Dream11_Points']]
+                    .rename(columns={'PlayerWithEmoji': 'Player', 'TeamColor': 'Team'})
+                )
 
                 # Plot visual of the team
                 fig = plot_team(combined)
                 st.pyplot(fig)
-
