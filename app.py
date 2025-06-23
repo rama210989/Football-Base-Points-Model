@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 
-# Team Dictionary
+# Team Codes
 teams = {
     'Arsenal': '18bb7c10',
     'Aston Villa': '8602292d',
@@ -25,7 +25,31 @@ teams = {
     'Wolves': '8cec06e1'
 }
 
-# Fetch Function (unchanged)
+# Team Logos
+team_logos = {
+    'Arsenal': 'https://resources.premierleague.com/premierleague/badges/t3.png',
+    'Aston Villa': 'https://resources.premierleague.com/premierleague/badges/t7.png',
+    'Bournemouth': 'https://resources.premierleague.com/premierleague/badges/t91.png',
+    'Brentford': 'https://resources.premierleague.com/premierleague/badges/t94.png',
+    'Brighton': 'https://resources.premierleague.com/premierleague/badges/t36.png',
+    'Burnley': 'https://resources.premierleague.com/premierleague/badges/t90.png',
+    'Chelsea': 'https://resources.premierleague.com/premierleague/badges/t8.png',
+    'Crystal Palace': 'https://resources.premierleague.com/premierleague/badges/t31.png',
+    'Everton': 'https://resources.premierleague.com/premierleague/badges/t11.png',
+    'Fulham': 'https://resources.premierleague.com/premierleague/badges/t54.png',
+    'Liverpool': 'https://resources.premierleague.com/premierleague/badges/t14.png',
+    'Luton Town': 'https://resources.premierleague.com/premierleague/badges/t102.png',
+    'Manchester City': 'https://resources.premierleague.com/premierleague/badges/t43.png',
+    'Manchester United': 'https://resources.premierleague.com/premierleague/badges/t1.png',
+    'Newcastle United': 'https://resources.premierleague.com/premierleague/badges/t4.png',
+    'Nottingham Forest': 'https://resources.premierleague.com/premierleague/badges/t17.png',
+    'Sheffield United': 'https://resources.premierleague.com/premierleague/badges/t49.png',
+    'Tottenham': 'https://resources.premierleague.com/premierleague/badges/t6.png',
+    'West Ham': 'https://resources.premierleague.com/premierleague/badges/t21.png',
+    'Wolves': 'https://resources.premierleague.com/premierleague/badges/t39.png'
+}
+
+# Data Fetching Function
 def fetch_team_data(team_code, team_name):
     url = f'https://fbref.com/en/squads/{team_code}/2023-2024/c9/stats'
     tables = pd.read_html(url)
@@ -136,9 +160,9 @@ def fetch_team_data(team_code, team_name):
     except Exception as e:
         return pd.DataFrame({'Error': [str(e)]})
 
-# Display Player Cards
+# Card display
 def display_player_cards(df, color):
-    for i, row in df.iterrows():
+    for _, row in df.iterrows():
         st.markdown(
             f"""
             <div style='
@@ -151,6 +175,33 @@ def display_player_cards(df, color):
                 <strong>{row['Player']}</strong> — {row['Pos']} — <strong>{int(row['Dream11_Points'])} pts</strong>
             </div>
             """, unsafe_allow_html=True)
+
+# Select best XI
+def select_best_xi(df1, df2):
+    combined = pd.concat([df1, df2], ignore_index=True)
+    combined.sort_values(by='Dream11_Points', ascending=False, inplace=True)
+
+    best11 = []
+    pos_limits = {'GK': 1, 'DF': 5, 'MF': 5, 'FWD': 3}
+    team_limits = {df1['Team'].iloc[0]: 7, df2['Team'].iloc[0]: 7}
+    team_counts = {df1['Team'].iloc[0]: 0, df2['Team'].iloc[0]: 0}
+    pos_counts = {'GK': 0, 'DF': 0, 'MF': 0, 'FWD': 0}
+
+    for _, row in combined.iterrows():
+        team = row['Team']
+        pos = row['Pos']
+        if team_counts[team] >= team_limits[team] or pos_counts[pos] >= pos_limits[pos]:
+            continue
+        best11.append(row)
+        team_counts[team] += 1
+        pos_counts[pos] += 1
+        if len(best11) == 11:
+            break
+
+    if min(team_counts.values()) < 4:
+        return pd.DataFrame({'Error': ['Failed team balance constraint.']})
+
+    return pd.DataFrame(best11)
 
 # Streamlit UI
 st.set_page_config(layout="wide")
@@ -166,6 +217,9 @@ with tab1:
         st.session_state['team1_name'] = team1
 
     if 'team1_df' in st.session_state:
+        logo_url = team_logos.get(st.session_state['team1_name'])
+        if logo_url:
+            st.image(logo_url, width=80)
         st.subheader(f"🔴 Top 15 - {st.session_state['team1_name']}")
         display_player_cards(st.session_state['team1_df'].head(15), "#ffe6e6")
 
@@ -177,37 +231,11 @@ with tab2:
         st.session_state['team2_name'] = team2
 
     if 'team2_df' in st.session_state:
+        logo_url = team_logos.get(st.session_state['team2_name'])
+        if logo_url:
+            st.image(logo_url, width=80)
         st.subheader(f"🔵 Top 15 - {st.session_state['team2_name']}")
         display_player_cards(st.session_state['team2_df'].head(15), "#e6f0ff")
-
-def select_best_xi(df1, df2):
-    combined = pd.concat([df1, df2], ignore_index=True)
-    combined.sort_values(by='Dream11_Points', ascending=False, inplace=True)
-
-    best11 = []
-    pos_limits = {'GK': 1, 'DF': 5, 'MF': 5, 'FWD': 3}
-    team_limits = {df1['Team'].iloc[0]: 7, df2['Team'].iloc[0]: 7}
-    team_counts = {df1['Team'].iloc[0]: 0, df2['Team'].iloc[0]: 0}
-    pos_counts = {'GK': 0, 'DF': 0, 'MF': 0, 'FWD': 0}
-
-    for _, row in combined.iterrows():
-        team = row['Team']
-        pos = row['Pos']
-
-        if team_counts[team] >= team_limits[team]: continue
-        if pos_counts[pos] >= pos_limits[pos]: continue
-
-        best11.append(row)
-        team_counts[team] += 1
-        pos_counts[pos] += 1
-
-        if len(best11) == 11:
-            break
-
-    if min(team_counts.values()) < 4:
-        return pd.DataFrame({'Error': ['Failed team balance constraint.']})
-
-    return pd.DataFrame(best11)
 
 with tab3:
     if 'team1_df' in st.session_state and 'team2_df' in st.session_state:
@@ -221,5 +249,3 @@ with tab3:
                 )
                 st.subheader("💥 Best Combined XI")
                 st.dataframe(combined[['Player', 'TeamColor', 'Pos', 'Dream11_Points']].rename(columns={'TeamColor': 'Team'}))
-
-
