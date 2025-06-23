@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+from team_visualizer import plot_team
 
 # Team Dictionary
 teams = {
@@ -234,7 +235,7 @@ with tab2:
     if 'team2_df' in st.session_state:
         st.subheader(f"🔵 Top 15 - {st.session_state['team2_name']}")
         display_player_cards(st.session_state['team2_df'].head(15), "#e6f0ff")
-
+        
 with tab3:
     if 'team1_df' in st.session_state and 'team2_df' in st.session_state:
         if st.button("⚔️ Generate Best Combined XI"):
@@ -247,3 +248,8 @@ with tab3:
                 )
                 st.subheader("💥 Best Combined XI")
                 st.dataframe(combined[['Player', 'TeamColor', 'Pos', 'Dream11_Points']].rename(columns={'TeamColor': 'Team'}))
+
+                # Plot visual of the team
+                fig = plot_team(combined)
+                st.pyplot(fig)
+
