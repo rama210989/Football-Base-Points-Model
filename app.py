@@ -1,53 +1,38 @@
 import streamlit as st
 import pandas as pd
-import requests
-import time
 
-# Updated FBref URLs (double-check team IDs)
-team_urls = {
-    "Arsenal": "https://fbref.com/en/squads/18bb7c10/2024-2025/Arsenal-Stats",
-    "Aston Villa": "https://fbref.com/en/squads/8602292d/2024-2025/Aston-Villa-Stats",
-    "Bournemouth": "https://fbref.com/en/squads/bffc15f4/2024-2025/Bournemouth-Stats",
-    "Brentford": "https://fbref.com/en/squads/7c21e445/2024-2025/Brentford-Stats",
-    "Brighton": "https://fbref.com/en/squads/bd87cffa/2024-2025/Brighton-and-Hove-Albion-Stats",
-    "Chelsea": "https://fbref.com/en/squads/cff3d9bb/2024-2025/Chelsea-Stats",
-    "Crystal Palace": "https://fbref.com/en/squads/47c64c55/2024-2025/Crystal-Palace-Stats",
-    "Everton": "https://fbref.com/en/squads/d3fd31cc/2024-2025/Everton-Stats",
-    "Fulham": "https://fbref.com/en/squads/fd962109/2024-2025/Fulham-Stats",
-    "Leeds United": "https://fbref.com/en/squads/5bfb9651/2024-2025/Leeds-United-Stats",
-    "Leicester City": "https://fbref.com/en/squads/6eb4d45d/2024-2025/Leicester-City-Stats",
-    "Liverpool": "https://fbref.com/en/squads/822bd0ba/2024-2025/Liverpool-Stats",
-    "Manchester City": "https://fbref.com/en/squads/b8fd03ef/2024-2025/Manchester-City-Stats",
-    "Manchester United": "https://fbref.com/en/squads/19538871/2024-2025/Manchester-United-Stats",
-    "Newcastle United": "https://fbref.com/en/squads/b2b47a98/2024-2025/Newcastle-United-Stats",
-    "Nottingham Forest": "https://fbref.com/en/squads/1c781004/2024-2025/Nottingham-Forest-Stats",
-    "Southampton": "https://fbref.com/en/squads/33c895d4/2024-2025/Southampton-Stats",
-    "Tottenham Hotspur": "https://fbref.com/en/squads/361ca564/2024-2025/Tottenham-Hotspur-Stats",
-    "West Ham United": "https://fbref.com/en/squads/7c21e445/2024-2025/West-Ham-United-Stats",
-    "Wolverhampton Wanderers": "https://fbref.com/en/squads/8cec06e1/2024-2025/Wolverhampton-Wanderers-Stats"
+# Team name and fbref URL suffix mapping (2023-24 Premier League)
+teams = {
+    'Arsenal': '18bb7c10',
+    'Aston Villa': '8602292d',
+    'Bournemouth': '4ba7cbea',
+    'Brentford': 'cd051869',
+    'Brighton': 'd07537b9',
+    'Burnley': '943e8050',
+    'Chelsea': 'cff3d9bb',
+    'Crystal Palace': '47c64c55',
+    'Everton': 'd3fd31cc',
+    'Fulham': 'fd962109',
+    'Liverpool': '822bd0ba',
+    'Luton Town': 'e297cd13',
+    'Manchester City': 'b8fd03ef',
+    'Manchester United': '19538871',
+    'Newcastle United': 'b2b47a98',
+    'Nottingham Forest': 'e4a775cb',
+    'Sheffield United': '1df6b87e',
+    'Tottenham': '361ca564',
+    'West Ham': '7c21e445',
+    'Wolves': '8cec06e1'
 }
 
-def safe_table(tables, idx):
-    try:
-        return tables[idx]
-    except IndexError:
-        return pd.DataFrame()
-
-def load_team_data_from_url(url, team_name):
-    try:
-        res = requests.get(url, timeout=15)
-        res.raise_for_status()
-        tables = pd.read_html(res.text)
-        time.sleep(2)  # be polite
-    except Exception as e:
-        st.error(f"Failed to load page for {team_name}: {e}")
-        return None
+@st.cache_data(show_spinner=False)
+def fetch_team_data(team_code):
+    url = f'https://fbref.com/en/squads/{team_code}/2023-2024/c9/stats'
+    tables = pd.read_html(url)
 
     try:
-        df_basic = safe_table(tables, 0)
-        if df_basic.empty:
-            raise Exception("Basic stats table not found")
-
+        # Basic stats
+        df_basic = tables[0]
         df_basic.columns = [' '.join(col).strip() for col in df_basic.columns.values]
         df_basic = df_basic[df_basic['Unnamed: 0_level_0 Player'] != 'Player']
         df_basic.rename(columns={
@@ -56,109 +41,103 @@ def load_team_data_from_url(url, team_name):
             'Playing Time Starts': 'Starts',
             'Performance CrdY': 'YC',
             'Performance CrdR': 'RC',
-            'Performance OG': 'OG',
             'Unnamed: 4_level_0 MP': 'Matches'
-        }, inplace=True, errors="ignore")
+        }, inplace=True)
 
-        def clean_df(tables, idx, column_renames):
-            df = safe_table(tables, idx)
-            if df.empty: return pd.DataFrame()
-            df.columns = [' '.join(col).strip() for col in df.columns.values]
-            df = df[df[df.columns[0]] != df.columns[0]]
-            df.rename(columns=column_renames, inplace=True, errors="ignore")
-            return df
+        # Passes
+        df_pass = tables[6]
+        df_pass.columns = [' '.join(col).strip() for col in df_pass.columns.values]
+        df_pass = df_pass[df_pass['Unnamed: 0_level_0 Player'] != 'Player']
+        df_pass.rename(columns={
+            'Unnamed: 0_level_0 Player': 'Player',
+            'Outcomes Cmp': 'Passes_Completed'
+        }, inplace=True)
 
-        df_pass = clean_df(tables, 6, {'Unnamed: 0_level_0 Player': 'Player', 'Outcomes Cmp': 'Passes_Completed'})
-        df_sca = clean_df(tables, 7, {'Unnamed: 0_level_0 Player': 'Player', 'SCA SCA': 'Chance_Created'})
-        df_standard = clean_df(tables, 4, {'Unnamed: 0_level_0 Player': 'Player', 'Standard SoT': 'Shots_on_Target'})
-        df_gk = clean_df(tables, 2, {'Unnamed: 0_level_0 Player': 'Player', 'Performance Saves': 'Saves', 'Performance GA': 'Goals_Against'})
-        df_def_misc = clean_df(tables, 11, {'Unnamed: 0_level_0 Player': 'Player', 'Performance Int': 'Interceptions', 'Performance TklW': 'Tackles_Won'})
+        # SCA
+        df_sca = tables[7]
+        df_sca.columns = [' '.join(col).strip() for col in df_sca.columns.values]
+        df_sca = df_sca[df_sca['Unnamed: 0_level_0 Player'] != 'Player']
+        df_sca.rename(columns={
+            'Unnamed: 0_level_0 Player': 'Player',
+            'SCA SCA': 'Chance_Created'
+        }, inplace=True)
 
-        df_all = df_basic
-        for extra in [df_pass, df_sca, df_standard, df_def_misc, df_gk]:
-            if not extra.empty:
-                df_all = df_all.merge(extra[['Player'] + [col for col in extra.columns if col != 'Player']], on='Player', how='left')
+        # Shots
+        df_standard = tables[4]
+        df_standard.columns = [' '.join(col).strip() for col in df_standard.columns.values]
+        df_standard = df_standard[df_standard['Unnamed: 0_level_0 Player'] != 'Player']
+        df_standard.rename(columns={
+            'Unnamed: 0_level_0 Player': 'Player',
+            'Standard SoT': 'Shots_on_Target'
+        }, inplace=True)
+
+        # Goalkeeping
+        df_gk = tables[2]
+        df_gk.columns = [' '.join(col).strip() for col in df_gk.columns.values]
+        df_gk = df_gk[df_gk['Unnamed: 0_level_0 Player'] != 'Player']
+        df_gk.rename(columns={
+            'Unnamed: 0_level_0 Player': 'Player',
+            'Performance Saves': 'Saves',
+            'Performance GA': 'Goals_Against'
+        }, inplace=True)
+
+        # Defensive stats
+        df_def_misc = tables[11]
+        df_def_misc.columns = [' '.join(col).strip() for col in df_def_misc.columns.values]
+        df_def_misc = df_def_misc[df_def_misc['Unnamed: 0_level_0 Player'] != 'Player']
+        df_def_misc.rename(columns={
+            'Unnamed: 0_level_0 Player': 'Player',
+            'Performance Int': 'Interceptions',
+            'Performance TklW': 'Tackles_Won',
+            'Performance OG': 'OG'
+        }, inplace=True)
+
+        # Merge all
+        df_all = df_basic.merge(df_pass[['Player', 'Passes_Completed']], on='Player', how='left')
+        df_all = df_all.merge(df_sca[['Player', 'Chance_Created']], on='Player', how='left')
+        df_all = df_all.merge(df_standard[['Player', 'Shots_on_Target']], on='Player', how='left')
+        df_all = df_all.merge(df_def_misc[['Player', 'Interceptions', 'Tackles_Won', 'OG']], on='Player', how='left')
+        df_all = df_all.merge(df_gk[['Player', 'Saves', 'Goals_Against']], on='Player', how='left')
 
         df_all.fillna(0, inplace=True)
-        numeric_cols = ['Matches', 'Starts', 'YC', 'RC', 'OG', 'Passes_Completed', 'Chance_Created',
-                        'Shots_on_Target', 'Tackles_Won', 'Interceptions', 'Saves', 'Goals_Against']
-        for col in numeric_cols:
-            df_all[col] = pd.to_numeric(df_all.get(col, 0), errors='coerce').fillna(0)
 
-        df_all['Team'] = team_name
-        return df_all
+        def calc_points(row):
+            points = 0
+            points += row['Chance_Created'] * 3
+            points += row['Shots_on_Target'] * 6
+            points += (row['Passes_Completed'] // 5) * 1
+            points += row['Tackles_Won'] * 4
+            points += row['Interceptions'] * 4
+            points += row['Saves'] * 6
+            points += (row['Starts'] > 0) * 4
+            points += (row['Matches'] - row['Starts']) * 2
+            points -= row['YC'] * 4
+            points -= row['RC'] * 10
+            points -= row['OG'] * 8
+            if row['Pos'] in ['GK', 'DF']:
+                points -= row['Goals_Against'] * 2
+            return points
+
+        df_all['Dream11_Points'] = df_all.apply(calc_points, axis=1)
+        df_all = df_all[~df_all['Player'].isin(['Squad Total', 'Opponent Total'])]
+        return df_all[['Player', 'Pos', 'Dream11_Points']].sort_values(by='Dream11_Points', ascending=False).head(15)
 
     except Exception as e:
-        st.error(f"Failed to parse stats for {team_name}: {e}")
-        return None
+        return pd.DataFrame({'Error': [str(e)]})
 
-def calc_points(row):
-    points = 0
-    points += row.get('Chance_Created', 0) * 3
-    points += row.get('Shots_on_Target', 0) * 6
-    points += (row.get('Passes_Completed', 0) // 5) * 1
-    points += row.get('Tackles_Won', 0) * 4
-    points += row.get('Interceptions', 0) * 4
-    points += row.get('Saves', 0) * 6
-    points += (row.get('Starts', 0) > 0) * 4
-    points += (row.get('Matches', 0) - row.get('Starts', 0)) * 2
-    points -= row.get('YC', 0) * 4
-    points -= row.get('RC', 0) * 10
-    points -= row.get('OG', 0) * 8
-    if row.get('Pos') in ['GK', 'DF']:
-        points -= row.get('Goals_Against', 0) * 2
-    return points
+# UI
+st.title("Dream11 Best 15 Generator (Premier League)")
 
-def select_best_11(df):
-    df['Points'] = df.apply(calc_points, axis=1)
-    df = df.sort_values(by='Points', ascending=False)
+col1, col2 = st.columns(2)
 
-    selected = []
-    count_team = {}
-    pos_count = {'GK': 0, 'DF': 0, 'MF': 0, 'FW': 0}
+with col1:
+    team1 = st.selectbox("Select Team 1", list(teams.keys()), key="team1")
+    if st.button("Get Best 15 - Team 1"):
+        st.subheader(f"Top 15 Players - {team1}")
+        st.dataframe(fetch_team_data(teams[team1]))
 
-    def pos_key(pos):
-        pos = str(pos).upper()
-        if 'GK' in pos: return 'GK'
-        elif 'DF' in pos: return 'DF'
-        elif 'MF' in pos: return 'MF'
-        elif 'FW' in pos: return 'FW'
-        else: return None
-
-    for _, row in df.iterrows():
-        if len(selected) == 11:
-            break
-        team = row['Team']
-        pos = pos_key(row['Pos'])
-        if not pos:
-            continue
-        if count_team.get(team, 0) >= 7:
-            continue
-        if pos_count[pos] >= {'GK': 1, 'DF': 5, 'MF': 5, 'FW': 3}[pos]:
-            continue
-
-        selected.append(row)
-        count_team[team] = count_team.get(team, 0) + 1
-        pos_count[pos] += 1
-
-    return pd.DataFrame(selected)[['Player', 'Pos', 'Team', 'Points']]
-
-# Streamlit UI
-st.title("Premier League Dream11 Best Playing 11 Selector")
-
-teams = list(team_urls.keys())
-team1 = st.selectbox("Select Team 1", teams, key="t1")
-team2 = st.selectbox("Select Team 2", teams, key="t2")
-
-if st.button("Select Best Playing 11"):
-    if team1 == team2:
-        st.error("Please select two different teams.")
-    else:
-        with st.spinner("Fetching data and computing best 11..."):
-            df1 = load_team_data_from_url(team_urls[team1], team1)
-            df2 = load_team_data_from_url(team_urls[team2], team2)
-            if df1 is not None and df2 is not None:
-                best_11 = select_best_11(pd.concat([df1, df2], ignore_index=True))
-                st.table(best_11)
-            else:
-                st.error("One or both teams failed to load.")
+with col2:
+    team2 = st.selectbox("Select Team 2", list(teams.keys()), key="team2")
+    if st.button("Get Best 15 - Team 2"):
+        st.subheader(f"Top 15 Players - {team2}")
+        st.dataframe(fetch_team_data(teams[team2]))
