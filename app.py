@@ -190,13 +190,6 @@ def get_player_positions_433():
                  'FWD': [(95, 20), (100, 40), (95, 60)]}
     return positions
 
-def last_name(name):
-    parts = name.split()
-    if len(parts) == 0:
-        return name
-    else:
-        return parts[-1]
-
 def plot_formation(best11_df, team1_name, team2_name):
     fig, ax = draw_pitch()
     pos_map = get_player_positions_433()
@@ -205,7 +198,7 @@ def plot_formation(best11_df, team1_name, team2_name):
     for _, row in best11_df.iterrows():
         pos = row['Pos']
         team = row['Team']
-        player = last_name(row['Player'])
+        player = row['Player']
         pts = row['Dream11_Points']
 
         if pos not in pos_map:
@@ -218,15 +211,11 @@ def plot_formation(best11_df, team1_name, team2_name):
         x, y = pos_map[pos][idx]
         pos_counts[pos] += 1
 
-        # Slight vertical offsets to reduce label overlap
-        y_name = y - 4 - (idx * 4)
-        y_pts = y + 4 + (idx * 4)
-
         color = 'red' if team == team1_name else 'blue'
 
         ax.scatter(x, y, s=600, color=color, alpha=0.7, edgecolors='black', linewidth=1.5, zorder=5)
-        ax.text(x, y_name, player, ha='center', va='bottom', fontsize=7, fontweight='bold', color=color)
-        ax.text(x, y_pts, f"{int(pts)} pts", ha='center', va='top', fontsize=6, color='black')
+        ax.text(x, y-4, player, ha='center', va='bottom', fontsize=9, fontweight='bold', color=color)
+        ax.text(x, y+4, f"{int(pts)} pts", ha='center', va='top', fontsize=8, color='black')
 
     st.pyplot(fig)
 
@@ -237,29 +226,36 @@ st.title("🏆 Dream11 Best 15 Generator (Premier League)")
 col1, col2 = st.columns(2)
 
 with col1:
-    team1 = st.selectbox("Select Team 1", list(teams.keys()), index=0)
-    if st.button("Generate Best 15 - Team 1"):
-        with st.spinner(f"Fetching data for {team1}..."):
-            df1 = fetch_team_data(teams[team1], team1)
-            st.dataframe(df1.head(15))
-            st.session_state['df1'] = df1
-            st.session_state['team1'] = team1
+    team1 = st.selectbox("🔴 Select Team 1", list(teams.keys()), key="team1")
+    if st.button("Generate Top 15 - Team 1"):
+        df1 = fetch_team_data(teams[team1], team1)
+        st.session_state['team1_df'] = df1
+        st.session_state['team1_name'] = team1
 
 with col2:
-    team2 = st.selectbox("Select Team 2", list(teams.keys()), index=1)
-    if st.button("Generate Best 15 - Team 2"):
-        with st.spinner(f"Fetching data for {team2}..."):
-            df2 = fetch_team_data(teams[team2], team2)
-            st.dataframe(df2.head(15))
-            st.session_state['df2'] = df2
-            st.session_state['team2'] = team2
+    team2 = st.selectbox("🔵 Select Team 2", list(teams.keys()), key="team2")
+    if st.button("Generate Top 15 - Team 2"):
+        df2 = fetch_team_data(teams[team2], team2)
+        st.session_state['team2_df'] = df2
+        st.session_state['team2_name'] = team2
 
-if 'df1' in st.session_state and 'df2' in st.session_state:
-    st.header(f"⚔️ Best Combined XI: {st.session_state['team1']} (Red) vs {st.session_state['team2']} (Blue)")
-    if st.button("Generate Best Combined 11"):
-        best11_df = select_best_xi(st.session_state['df1'], st.session_state['df2'])
-        if 'Error' in best11_df.columns:
-            st.error(best11_df['Error'][0])
+if 'team1_df' in st.session_state:
+    st.subheader(f"🔴 Top 15 Players - {st.session_state['team1_name']}")
+    st.dataframe(st.session_state['team1_df'].head(15))
+
+if 'team2_df' in st.session_state:
+    st.subheader(f"🔵 Top 15 Players - {st.session_state['team2_name']}")
+    st.dataframe(st.session_state['team2_df'].head(15))
+
+if 'team1_df' in st.session_state and 'team2_df' in st.session_state:
+    if st.button("⚔️ Generate Best Combined XI"):
+        combined = select_best_xi(st.session_state['team1_df'], st.session_state['team2_df'])
+        if 'Error' in combined.columns:
+            st.error(combined.iloc[0]['Error'])
         else:
-            st.dataframe(best11_df)
-            plot_formation(best11_df, st.session_state['team1'], st.session_state['team2'])
+            combined['TeamColor'] = combined['Team'].apply(lambda x: '🔴 ' + x if x == st.session_state['team1_name'] else '🔵 ' + x)
+            st.subheader("💥 Best Combined XI Table")
+            st.dataframe(combined[['Player', 'TeamColor', 'Pos', 'Dream11_Points']].rename(columns={'TeamColor': 'Team'}))
+            
+            st.subheader("⚽ Visual Formation (4-3-3)")
+            plot_formation(combined, st.session_state['team1_name'], st.session_state['team2_name'])
