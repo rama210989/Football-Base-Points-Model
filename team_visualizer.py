@@ -44,11 +44,12 @@ def plot_team(df_best11):
         x, y = pos_coords[pos][idx]
         pos_count[pos] += 1
 
-        icon = pos_icons.get(pos, '')
+        # Use PlayerWithEmoji column for compact surname + emoji display on pitch
+        player_text = row.get('PlayerWithEmoji', row['Player'])
 
         ax.text(
             x, y,
-            f"{icon} {row['Player']}\n{int(row['Dream11_Points'])} pts",
+            f"{player_text}\n{int(row['Dream11_Points'])} pts",
             ha='center', va='center',
             fontsize=10,
             color='yellow',
