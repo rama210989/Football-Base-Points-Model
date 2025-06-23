@@ -1,7 +1,5 @@
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
-from matplotlib.patches import Rectangle, Circle
 
 teams = {
     'Arsenal': '18bb7c10',
@@ -168,57 +166,6 @@ def select_best_xi(df1, df2):
 
     return pd.DataFrame(best11)
 
-def draw_pitch():
-    fig, ax = plt.subplots(figsize=(10, 7))
-    ax.add_patch(Rectangle((0, 0), width=120, height=80, fill=False, linewidth=2, color="green"))
-    centre_circle = Circle((60, 40), 10, fill=False, linewidth=2, color="green")
-    ax.add_patch(centre_circle)
-    ax.plot([60, 60], [0, 80], color="green", linewidth=2)
-    ax.add_patch(Rectangle((0, 18), 18, 44, fill=False, linewidth=2, color="green"))
-    ax.add_patch(Rectangle((102, 18), 18, 44, fill=False, linewidth=2, color="green"))
-    ax.add_patch(Rectangle((-2, 30), 2, 20, fill=False, linewidth=2, color="green"))
-    ax.add_patch(Rectangle((120, 30), 2, 20, fill=False, linewidth=2, color="green"))
-    ax.set_xlim(-5, 125)
-    ax.set_ylim(-5, 85)
-    ax.axis('off')
-    return fig, ax
-
-def get_player_positions_433():
-    positions = {'GK': [(5, 40)],
-                 'DF': [(25, 15), (25, 30), (25, 50), (25, 65)],
-                 'MF': [(60, 25), (60, 40), (60, 55)],
-                 'FWD': [(95, 20), (100, 40), (95, 60)]}
-    return positions
-
-def plot_formation(best11_df, team1_name, team2_name):
-    fig, ax = draw_pitch()
-    pos_map = get_player_positions_433()
-    pos_counts = {'GK': 0, 'DF': 0, 'MF': 0, 'FWD': 0}
-
-    for _, row in best11_df.iterrows():
-        pos = row['Pos']
-        team = row['Team']
-        player = row['Player']
-        pts = row['Dream11_Points']
-
-        if pos not in pos_map:
-            pos = 'MF'  # fallback
-
-        idx = pos_counts[pos]
-        if idx >= len(pos_map[pos]):
-            idx = len(pos_map[pos]) - 1
-
-        x, y = pos_map[pos][idx]
-        pos_counts[pos] += 1
-
-        color = 'red' if team == team1_name else 'blue'
-
-        ax.scatter(x, y, s=600, color=color, alpha=0.7, edgecolors='black', linewidth=1.5, zorder=5)
-        ax.text(x, y-4, player, ha='center', va='bottom', fontsize=9, fontweight='bold', color=color)
-        ax.text(x, y+4, f"{int(pts)} pts", ha='center', va='top', fontsize=8, color='black')
-
-    st.pyplot(fig)
-
 # Streamlit UI
 st.set_page_config(layout="wide")
 st.title("🏆 Dream11 Best 15 Generator (Premier League)")
@@ -256,6 +203,3 @@ if 'team1_df' in st.session_state and 'team2_df' in st.session_state:
             combined['TeamColor'] = combined['Team'].apply(lambda x: '🔴 ' + x if x == st.session_state['team1_name'] else '🔵 ' + x)
             st.subheader("💥 Best Combined XI Table")
             st.dataframe(combined[['Player', 'TeamColor', 'Pos', 'Dream11_Points']].rename(columns={'TeamColor': 'Team'}))
-            
-            st.subheader("⚽ Visual Formation (4-3-3)")
-            plot_formation(combined, st.session_state['team1_name'], st.session_state['team2_name'])
