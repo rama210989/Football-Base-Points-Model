@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 
+# Team Dictionary
 teams = {
     'Arsenal': '18bb7c10',
     'Aston Villa': '8602292d',
@@ -24,6 +25,7 @@ teams = {
     'Wolves': '8cec06e1'
 }
 
+# Fetch Function (unchanged)
 def fetch_team_data(team_code, team_name):
     url = f'https://fbref.com/en/squads/{team_code}/2023-2024/c9/stats'
     tables = pd.read_html(url)
@@ -105,7 +107,7 @@ def fetch_team_data(team_code, team_name):
             elif 'DF' in pos:
                 return 'DF'
             else:
-                return 'MF'  # fallback for unknown positions
+                return 'MF'
 
         def calc_points(row):
             points = 0
@@ -134,13 +136,56 @@ def fetch_team_data(team_code, team_name):
     except Exception as e:
         return pd.DataFrame({'Error': [str(e)]})
 
+# Display Player Cards
+def display_player_cards(df, color):
+    for i, row in df.iterrows():
+        st.markdown(
+            f"""
+            <div style='
+                border:1px solid #ccc;
+                padding:10px;
+                border-radius:8px;
+                margin-bottom:8px;
+                background-color: {color};
+            '>
+                <strong>{row['Player']}</strong> — {row['Pos']} — <strong>{int(row['Dream11_Points'])} pts</strong>
+            </div>
+            """, unsafe_allow_html=True)
+
+# Streamlit UI
+st.set_page_config(layout="wide")
+st.title("🏆 Dream11 Base Point Generator (Premier League)")
+
+tab1, tab2, tab3 = st.tabs(["🔴 Team 1", "🔵 Team 2", "⚔️ Combined XI"])
+
+with tab1:
+    team1 = st.selectbox("Choose Team 1", list(teams.keys()), key="team1")
+    if st.button("Generate Top 15 - Team 1"):
+        df1 = fetch_team_data(teams[team1], team1)
+        st.session_state['team1_df'] = df1
+        st.session_state['team1_name'] = team1
+
+    if 'team1_df' in st.session_state:
+        st.subheader(f"🔴 Top 15 - {st.session_state['team1_name']}")
+        display_player_cards(st.session_state['team1_df'].head(15), "#ffe6e6")
+
+with tab2:
+    team2 = st.selectbox("Choose Team 2", list(teams.keys()), key="team2")
+    if st.button("Generate Top 15 - Team 2"):
+        df2 = fetch_team_data(teams[team2], team2)
+        st.session_state['team2_df'] = df2
+        st.session_state['team2_name'] = team2
+
+    if 'team2_df' in st.session_state:
+        st.subheader(f"🔵 Top 15 - {st.session_state['team2_name']}")
+        display_player_cards(st.session_state['team2_df'].head(15), "#e6f0ff")
+
 def select_best_xi(df1, df2):
     combined = pd.concat([df1, df2], ignore_index=True)
     combined.sort_values(by='Dream11_Points', ascending=False, inplace=True)
 
     best11 = []
     pos_limits = {'GK': 1, 'DF': 5, 'MF': 5, 'FWD': 3}
-    pos_min = {'GK': 1, 'DF': 3, 'MF': 3, 'FWD': 1}
     team_limits = {df1['Team'].iloc[0]: 7, df2['Team'].iloc[0]: 7}
     team_counts = {df1['Team'].iloc[0]: 0, df2['Team'].iloc[0]: 0}
     pos_counts = {'GK': 0, 'DF': 0, 'MF': 0, 'FWD': 0}
@@ -149,10 +194,8 @@ def select_best_xi(df1, df2):
         team = row['Team']
         pos = row['Pos']
 
-        if team_counts[team] >= team_limits[team]:
-            continue
-        if pos_counts[pos] >= pos_limits[pos]:
-            continue
+        if team_counts[team] >= team_limits[team]: continue
+        if pos_counts[pos] >= pos_limits[pos]: continue
 
         best11.append(row)
         team_counts[team] += 1
@@ -161,45 +204,22 @@ def select_best_xi(df1, df2):
         if len(best11) == 11:
             break
 
-    if team_counts[df1['Team'].iloc[0]] < 4 or team_counts[df2['Team'].iloc[0]] < 4:
+    if min(team_counts.values()) < 4:
         return pd.DataFrame({'Error': ['Failed team balance constraint.']})
 
     return pd.DataFrame(best11)
 
-# Streamlit UI
-st.set_page_config(layout="wide")
-st.title("🏆 Dream11 Base Point Generator (Premier League)")
+with tab3:
+    if 'team1_df' in st.session_state and 'team2_df' in st.session_state:
+        if st.button("⚔️ Generate Best Combined XI"):
+            combined = select_best_xi(st.session_state['team1_df'], st.session_state['team2_df'])
+            if 'Error' in combined.columns:
+                st.error(combined.iloc[0]['Error'])
+            else:
+                combined['TeamColor'] = combined['Team'].apply(
+                    lambda x: '🔴 ' + x if x == st.session_state['team1_name'] else '🔵 ' + x
+                )
+                st.subheader("💥 Best Combined XI")
+                st.dataframe(combined[['Player', 'TeamColor', 'Pos', 'Dream11_Points']].rename(columns={'TeamColor': 'Team'}))
 
-col1, col2 = st.columns(2)
 
-with col1:
-    team1 = st.selectbox("🔴 Select Team 1", list(teams.keys()), key="team1")
-    if st.button("Generate Top 15 - Team 1"):
-        df1 = fetch_team_data(teams[team1], team1)
-        st.session_state['team1_df'] = df1
-        st.session_state['team1_name'] = team1
-
-with col2:
-    team2 = st.selectbox("🔵 Select Team 2", list(teams.keys()), key="team2")
-    if st.button("Generate Top 15 - Team 2"):
-        df2 = fetch_team_data(teams[team2], team2)
-        st.session_state['team2_df'] = df2
-        st.session_state['team2_name'] = team2
-
-if 'team1_df' in st.session_state:
-    st.subheader(f"🔴 Top 15 Players - {st.session_state['team1_name']}")
-    st.dataframe(st.session_state['team1_df'].head(15))
-
-if 'team2_df' in st.session_state:
-    st.subheader(f"🔵 Top 15 Players - {st.session_state['team2_name']}")
-    st.dataframe(st.session_state['team2_df'].head(15))
-
-if 'team1_df' in st.session_state and 'team2_df' in st.session_state:
-    if st.button("⚔️ Generate Best Combined XI"):
-        combined = select_best_xi(st.session_state['team1_df'], st.session_state['team2_df'])
-        if 'Error' in combined.columns:
-            st.error(combined.iloc[0]['Error'])
-        else:
-            combined['TeamColor'] = combined['Team'].apply(lambda x: '🔴 ' + x if x == st.session_state['team1_name'] else '🔵 ' + x)
-            st.subheader("💥 Best Combined XI Table")
-            st.dataframe(combined[['Player', 'TeamColor', 'Pos', 'Dream11_Points']].rename(columns={'TeamColor': 'Team'}))
