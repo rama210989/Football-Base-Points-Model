@@ -24,17 +24,15 @@ teams = {
     'Wolves': '8cec06e1'
 }
 
-def fetch_team_data(team_code):
+def fetch_team_data(team_code, team_name):
     url = f'https://fbref.com/en/squads/{team_code}/2023-2024/c9/stats'
     tables = pd.read_html(url)
 
     try:
-        # Basic stats
         df_basic = tables[0]
         df_basic.columns = [' '.join(col).strip() for col in df_basic.columns.values]
         df_basic = df_basic[df_basic['Unnamed: 0_level_0 Player'] != 'Player']
 
-        # Dynamically rename key columns
         rename_map = {}
         for col in df_basic.columns:
             if 'Player' in col: rename_map[col] = 'Player'
@@ -45,7 +43,6 @@ def fetch_team_data(team_code):
             if 'CrdR' in col: rename_map[col] = 'RC'
         df_basic.rename(columns=rename_map, inplace=True)
 
-        # Defensive + Misc
         df_def_misc = tables[11]
         df_def_misc.columns = [' '.join(col).strip() for col in df_def_misc.columns.values]
         df_def_misc = df_def_misc[df_def_misc['Unnamed: 0_level_0 Player'] != 'Player']
@@ -89,7 +86,6 @@ def fetch_team_data(team_code):
             'Performance GA': 'Goals_Against'
         }, inplace=True)
 
-        # Merge all
         df_all = df_basic.merge(df_pass[['Player', 'Passes_Completed']], on='Player', how='left')
         df_all = df_all.merge(df_sca[['Player', 'Chance_Created']], on='Player', how='left')
         df_all = df_all.merge(df_standard[['Player', 'Shots_on_Target']], on='Player', how='left')
@@ -97,6 +93,13 @@ def fetch_team_data(team_code):
         df_all = df_all.merge(df_gk[['Player', 'Saves', 'Goals_Against']], on='Player', how='left')
 
         df_all.fillna(0, inplace=True)
+
+        def clean_position(pos):
+            pos = str(pos)
+            if 'FWD' in pos: return 'FWD'
+            elif 'MF' in pos: return 'MF'
+            elif 'DF' in pos: return 'DF'
+            else: return 'GK'
 
         def calc_points(row):
             points = 0
@@ -115,16 +118,50 @@ def fetch_team_data(team_code):
                 points -= row['Goals_Against'] * 2
             return points
 
+        df_all['Pos'] = df_all['Pos'].apply(clean_position)
         df_all['Dream11_Points'] = df_all.apply(calc_points, axis=1)
+        df_all['Team'] = team_name
         df_all = df_all[~df_all['Player'].isin(['Squad Total', 'Opponent Total'])]
-        return df_all[['Player', 'Pos', 'Dream11_Points']].sort_values(by='Dream11_Points', ascending=False).head(15)
+
+        return df_all[['Player', 'Team', 'Pos', 'Dream11_Points']].sort_values(by='Dream11_Points', ascending=False)
 
     except Exception as e:
         return pd.DataFrame({'Error': [str(e)]})
 
+def select_best_xi(df1, df2):
+    combined = pd.concat([df1, df2], ignore_index=True)
+    combined.sort_values(by='Dream11_Points', ascending=False, inplace=True)
 
-# ---- Streamlit App ----
+    best11 = []
+    pos_limits = {'GK': 1, 'DF': 5, 'MF': 5, 'FWD': 3}
+    pos_min = {'GK': 1, 'DF': 3, 'MF': 3, 'FWD': 1}
+    team_limits = {df1['Team'].iloc[0]: 7, df2['Team'].iloc[0]: 7}
+    team_counts = {df1['Team'].iloc[0]: 0, df2['Team'].iloc[0]: 0}
+    pos_counts = {'GK': 0, 'DF': 0, 'MF': 0, 'FWD': 0}
 
+    for _, row in combined.iterrows():
+        team = row['Team']
+        pos = row['Pos']
+
+        if team_counts[team] >= team_limits[team]:
+            continue
+        if pos_counts[pos] >= pos_limits[pos]:
+            continue
+
+        best11.append(row)
+        team_counts[team] += 1
+        pos_counts[pos] += 1
+
+        if len(best11) == 11:
+            break
+
+    # Ensure min team constraints
+    if team_counts[df1['Team'].iloc[0]] < 4 or team_counts[df2['Team'].iloc[0]] < 4:
+        return pd.DataFrame({'Error': ['Failed team balance constraint.']})
+
+    return pd.DataFrame(best11)
+
+# Streamlit UI
 st.set_page_config(layout="wide")
 st.title("🏆 Dream11 Best 15 Generator (Premier League)")
 
@@ -133,20 +170,34 @@ col1, col2 = st.columns(2)
 with col1:
     team1 = st.selectbox("🔴 Select Team 1", list(teams.keys()), key="team1")
     if st.button("Generate Top 15 - Team 1"):
-        st.session_state['team1_df'] = fetch_team_data(teams[team1])
+        df1 = fetch_team_data(teams[team1], team1)
+        st.session_state['team1_df'] = df1
         st.session_state['team1_name'] = team1
 
 with col2:
     team2 = st.selectbox("🔵 Select Team 2", list(teams.keys()), key="team2")
     if st.button("Generate Top 15 - Team 2"):
-        st.session_state['team2_df'] = fetch_team_data(teams[team2])
+        df2 = fetch_team_data(teams[team2], team2)
+        st.session_state['team2_df'] = df2
         st.session_state['team2_name'] = team2
 
-# Show outputs
+# Display teams
 if 'team1_df' in st.session_state:
     st.subheader(f"🔴 Top 15 Players - {st.session_state['team1_name']}")
-    st.dataframe(st.session_state['team1_df'])
+    st.dataframe(st.session_state['team1_df'].head(15))
 
 if 'team2_df' in st.session_state:
     st.subheader(f"🔵 Top 15 Players - {st.session_state['team2_name']}")
-    st.dataframe(st.session_state['team2_df'])
+    st.dataframe(st.session_state['team2_df'].head(15))
+
+# Combine button
+if 'team1_df' in st.session_state and 'team2_df' in st.session_state:
+    if st.button("⚔️ Generate Best Combined XI"):
+        combined = select_best_xi(st.session_state['team1_df'], st.session_state['team2_df'])
+        if 'Error' in combined.columns:
+            st.error(combined.iloc[0]['Error'])
+        else:
+            styled = combined.copy()
+            styled['Team'] = styled['Team'].apply(lambda x: f"🔴 {x}" if x == st.session_state['team1_name'] else f"🔵 {x}")
+            st.subheader("💥 Best Combined XI")
+            st.dataframe(styled[['Player', 'Team', 'Pos', 'Dream11_Points']])
