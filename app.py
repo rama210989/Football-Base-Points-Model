@@ -33,14 +33,17 @@ def fetch_team_data(team_code):
         df_basic = tables[0]
         df_basic.columns = [' '.join(col).strip() for col in df_basic.columns.values]
         df_basic = df_basic[df_basic['Unnamed: 0_level_0 Player'] != 'Player']
-        df_basic.rename(columns={
-            'Unnamed: 0_level_0 Player': 'Player',
-            'Unnamed: 2_level_0 Pos': 'Pos',
-            'Playing Time Starts': 'Starts',
-            'Performance CrdY': 'YC',
-            'Performance CrdR': 'RC',
-            'Unnamed: 4_level_0 MP': 'Matches'
-        }, inplace=True)
+
+        # Dynamically rename key columns
+        rename_map = {}
+        for col in df_basic.columns:
+            if 'Player' in col: rename_map[col] = 'Player'
+            if 'Pos' in col: rename_map[col] = 'Pos'
+            if 'Starts' in col: rename_map[col] = 'Starts'
+            if 'MP' in col: rename_map[col] = 'Matches'
+            if 'CrdY' in col: rename_map[col] = 'YC'
+            if 'CrdR' in col: rename_map[col] = 'RC'
+        df_basic.rename(columns=rename_map, inplace=True)
 
         # Defensive + Misc
         df_def_misc = tables[11]
@@ -86,6 +89,7 @@ def fetch_team_data(team_code):
             'Performance GA': 'Goals_Against'
         }, inplace=True)
 
+        # Merge all
         df_all = df_basic.merge(df_pass[['Player', 'Passes_Completed']], on='Player', how='left')
         df_all = df_all.merge(df_sca[['Player', 'Chance_Created']], on='Player', how='left')
         df_all = df_all.merge(df_standard[['Player', 'Shots_on_Target']], on='Player', how='left')
@@ -119,6 +123,8 @@ def fetch_team_data(team_code):
         return pd.DataFrame({'Error': [str(e)]})
 
 
+# ---- Streamlit App ----
+
 st.set_page_config(layout="wide")
 st.title("🏆 Dream11 Best 15 Generator (Premier League)")
 
@@ -136,7 +142,7 @@ with col2:
         st.session_state['team2_df'] = fetch_team_data(teams[team2])
         st.session_state['team2_name'] = team2
 
-# Display both results side-by-side if available
+# Show outputs
 if 'team1_df' in st.session_state:
     st.subheader(f"🔴 Top 15 Players - {st.session_state['team1_name']}")
     st.dataframe(st.session_state['team1_df'])
