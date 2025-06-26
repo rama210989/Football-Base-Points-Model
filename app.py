@@ -28,7 +28,7 @@ teams = {
 
 # Fetch Function (unchanged)
 def fetch_team_data(team_code, team_name):
-    url = f'https://fbref.com/en/squads/{team_code}/2023-2024/c9/stats'
+    url = f'https://fbref.com/en/squads/{team_code}/2024-2025/c9/stats'
     tables = pd.read_html(url)
 
     try:
