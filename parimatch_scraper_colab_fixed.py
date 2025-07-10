@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 """
-Parimatch Premier League Correct Score Odds Scraper - Google Colab Version
+Parimatch Premier League Correct Score Odds Scraper - Google Colab Version (FIXED)
 
 This script scrapes REAL correct score odds for upcoming Premier League matches 
 from Parimatch. No fake data generation - only real odds from the actual website.
 
 Instructions for Google Colab:
-1. Upload this file to Colab
-2. Run the installation cell first
-3. Run the main scraper cell
+1. Run the installation code first  
+2. Run this main script
 """
 
 import json
@@ -24,10 +23,7 @@ def install_dependencies():
     import subprocess
     import sys
     
-    packages = [
-        'selenium',
-        'webdriver-manager'
-    ]
+    packages = ['selenium', 'webdriver-manager']
     
     for package in packages:
         try:
@@ -50,9 +46,9 @@ def setup_chrome_colab():
     
     print("Chrome setup complete!")
 
-class ParimatchScraperColab:
+class ParimatchScraper:
     def __init__(self, debug: bool = True):
-        """Initialize the scraper with debug mode enabled by default"""
+        """Initialize the scraper with debug mode"""
         self.base_url = "https://parimatchglobal.com"
         self.premier_league_url = "https://parimatchglobal.com/en/football/premier-league-7f5506e872d14928adf0613efa509494/prematch"
         self.driver = None
@@ -63,6 +59,8 @@ class ParimatchScraperColab:
         from selenium import webdriver
         from selenium.webdriver.chrome.options import Options
         from selenium.webdriver.chrome.service import Service
+        
+        print("🚀 Setting up Chrome driver...")
         
         options = Options()
         
@@ -105,7 +103,7 @@ class ParimatchScraperColab:
         print("✅ Chrome driver setup successful!")
         return driver
     
-    def debug_page_content(self, description=""):
+    def debug_page(self, description=""):
         """Debug what's actually on the page"""
         if not self.debug:
             return
@@ -143,18 +141,24 @@ class ParimatchScraperColab:
         # Look for any upcoming fixtures/events
         print(f"Page source length: {len(self.driver.page_source)} characters")
         
-    def extract_match_links(self) -> List[str]:
-        """Extract links to individual match pages - REAL DATA ONLY"""
-        print("🔍 Navigating to Premier League page...")
+    def find_match_links(self) -> List[str]:
+        """Find real match links from Parimatch - NO FAKE DATA"""
+        print("🔍 Looking for Premier League matches...")
         
         try:
             self.driver.get(self.premier_league_url)
             time.sleep(8)  # Wait for page load
             
-            self.debug_page_content("Premier League page loaded")
+            self.debug_page("Premier League page loaded")
             
-            # Try multiple approaches to find match links
-            selectors_to_try = [
+            # Scroll to load content
+            print("📜 Scrolling to load all content...")
+            for i in range(5):
+                self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+                time.sleep(2)
+            
+            # Try different selectors for match links
+            selectors = [
                 "a[href*='/en/events/']",
                 "a[href*='/events/']", 
                 "a[href*='/football/']",
@@ -163,23 +167,14 @@ class ParimatchScraperColab:
                 ".match a",
                 ".fixture a",
                 "[data-testid*='event'] a",
-                "[data-testid*='match'] a",
-                ".sport-event a",
-                ".match-row a",
-                ".event-row a"
+                "[data-testid*='match'] a"
             ]
             
             match_links = []
             
-            # Scroll to load content
-            print("📜 Scrolling to load all content...")
-            for i in range(5):
-                self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-                time.sleep(2)
-            
             print("🔎 Searching for match links...")
             
-            for selector in selectors_to_try:
+            for selector in selectors:
                 try:
                     from selenium.webdriver.common.by import By
                     elements = self.driver.find_elements(By.CSS_SELECTOR, selector)
@@ -237,6 +232,7 @@ class ParimatchScraperColab:
                     print(f"🏆 Found Premier League teams on page: {teams_found[:5]}...")
                     
                     # Try to find links near team names
+                    from selenium.webdriver.common.by import By
                     all_links = self.driver.find_elements(By.TAG_NAME, "a")
                     for link in all_links:
                         try:
@@ -276,7 +272,7 @@ class ParimatchScraperColab:
             print(f"❌ Error extracting match links: {e}")
             return []
     
-    def extract_team_names(self, match_url: str) -> Optional[str]:
+    def get_team_names(self, match_url: str) -> str:
         """Extract team names from match page"""
         try:
             from selenium.webdriver.common.by import By
@@ -313,7 +309,7 @@ class ParimatchScraperColab:
             print(f"Error extracting team names: {e}")
             return "Match Teams Unknown"
     
-    def extract_correct_score_odds(self, match_url: str) -> Optional[Dict]:
+    def extract_odds(self, match_url: str) -> Optional[Dict]:
         """Extract correct score odds for a specific match - REAL DATA ONLY"""
         print(f"🎯 Processing match: {match_url}")
         
@@ -321,10 +317,10 @@ class ParimatchScraperColab:
             self.driver.get(match_url)
             time.sleep(5)
             
-            self.debug_page_content(f"Match page: {match_url}")
+            self.debug_page(f"Match page: {match_url}")
             
             # Extract team names
-            team_names = self.extract_team_names(match_url)
+            team_names = self.get_team_names(match_url)
             print(f"⚽ Teams: {team_names}")
             
             # Look for correct score section
@@ -435,19 +431,24 @@ class ParimatchScraperColab:
             print(f"❌ Error extracting odds: {e}")
             return None
     
-    def scrape_all_matches(self) -> List[Dict]:
-        """Scrape correct score odds for all Premier League matches - REAL DATA ONLY"""
+    def scrape(self) -> List[Dict]:
+        """Main scraping function - REAL DATA ONLY"""
+        print("🏆 PARIMATCH PREMIER LEAGUE SCRAPER")
+        print("=" * 50)
+        print("⚠️ ONLY REAL DATA - NO FAKE ODDS!")
+        print("=" * 50)
+        
         results = []
         
         try:
-            print("🚀 Starting Parimatch scraper...")
+            # Setup browser
             self.driver = self.setup_driver()
             
-            # Extract match links
-            match_links = self.extract_match_links()
+            # Find matches
+            match_links = self.find_match_links()
             
             if not match_links:
-                print("❌ NO REAL MATCH LINKS FOUND!")
+                print("\n❌ NO REAL MATCH LINKS FOUND!")
                 print("Cannot proceed without actual match URLs from Parimatch.")
                 print("This means either:")
                 print("  1. No Premier League matches are currently available")
@@ -456,14 +457,14 @@ class ParimatchScraperColab:
                 print("  4. Different URL/approach needed")
                 return []
             
-            print(f"📅 Processing {len(match_links)} real matches...")
+            print(f"\n📅 Processing {len(match_links)} real matches...")
             
             # Process each match
             for i, match_url in enumerate(match_links, 1):
                 print(f"\n--- Match {i}/{len(match_links)} ---")
                 
                 try:
-                    match_data = self.extract_correct_score_odds(match_url)
+                    match_data = self.extract_odds(match_url)
                     if match_data:
                         results.append(match_data)
                         print(f"✅ Success: {match_data['match']}")
@@ -486,6 +487,7 @@ class ParimatchScraperColab:
         finally:
             if self.driver:
                 self.driver.quit()
+                print("\n🔒 Browser closed")
 
 
 def main():
@@ -500,11 +502,11 @@ def main():
     setup_chrome_colab()
     
     # Initialize scraper with debug mode
-    scraper = ParimatchScraperColab(debug=True)
+    scraper = ParimatchScraper(debug=True)
     
     try:
         # Run the scraper
-        results = scraper.scrape_all_matches()
+        results = scraper.scrape()
         
         if results:
             print(f"\n🎉 SUCCESS! Found REAL odds for {len(results)} matches")
@@ -554,14 +556,16 @@ if __name__ == "__main__":
 To run this in Google Colab:
 
 1. Create a new notebook
-2. Paste this code into a cell
-3. Run it!
+2. First cell - Installation:
+   !pip install selenium webdriver-manager
+   !apt-get update
+   !apt-get install -y chromium-browser chromium-chromedriver
+
+3. Second cell - Copy this entire script and run it!
 
 The script will:
-- Install all required packages
-- Setup Chrome browser
+- Setup Chrome browser automatically
 - Scrape REAL odds from Parimatch
-- Display results in the exact format you requested
-
-No fake data - only real Premier League odds from the actual website!
+- Display results in your requested JSON format
+- NO fake data - only real Premier League odds!
 """
