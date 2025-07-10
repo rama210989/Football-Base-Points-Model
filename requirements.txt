@@ -3,3 +3,6 @@ pandas
 lxml
 html5lib
 matplotlib
+selenium>=4.15.0
+undetected-chromedriver>=3.5.3
+webdriver-manager>=4.0.0
