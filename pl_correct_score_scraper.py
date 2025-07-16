@@ -292,7 +292,7 @@ def get_fixtures_flashscore_cloudscraper():
         logging.warning(f"❌ Flashscore (cloudscraper) error: {e}")
         return []
 
-def get_real_fixtures(driver):
+def get_real_fixtures(driver=None):
     for source, func in [
         ("Flashscore (requests)", get_fixtures_flashscore_requests),
         ("Soccerway (requests)", get_fixtures_soccerway_requests),
@@ -315,6 +315,128 @@ def get_real_fixtures(driver):
         except Exception as e:
             logging.warning(f"❌ Failed to scrape {source}: {e}")
     return []
+
+# --- New Fixture Sources ---
+def get_fixtures_livescore():
+    url = 'https://www.livescore.com/en/football/england/premier-league/fixtures/'
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+    try:
+        resp = requests.get(url, headers=headers, timeout=10)
+        soup = BeautifulSoup(resp.text, 'html.parser')
+        fixtures = set()
+        for match in soup.find_all('a', href=re.compile(r'/en/football/england/premier-league/')):
+            teams = match.find_all('span', class_='MatchRowTeamName')
+            if len(teams) == 2:
+                home = clean_team_name(teams[0].get_text(strip=True))
+                away = clean_team_name(teams[1].get_text(strip=True))
+                if home and away and home != away:
+                    fixtures.add((home, away))
+        if not fixtures:
+            with open('debug_livescore.html', 'w') as f:
+                f.write(soup.prettify())
+            logging.debug('Livescore HTML snippet: ' + soup.prettify()[:2000])
+        return list(fixtures)
+    except Exception as e:
+        logging.warning(f"❌ Livescore error: {e}")
+        return []
+
+def get_fixtures_fctables():
+    url = 'https://www.fctables.com/england/premier-league/fixtures/'
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+    try:
+        resp = requests.get(url, headers=headers, timeout=10)
+        soup = BeautifulSoup(resp.text, 'html.parser')
+        fixtures = set()
+        for row in soup.find_all('tr', class_='odd') + soup.find_all('tr', class_='even'):
+            teams = row.find_all('a', href=re.compile(r'/team/'))
+            if len(teams) == 2:
+                home = clean_team_name(teams[0].get_text(strip=True))
+                away = clean_team_name(teams[1].get_text(strip=True))
+                if home and away and home != away:
+                    fixtures.add((home, away))
+        if not fixtures:
+            with open('debug_fctables.html', 'w') as f:
+                f.write(soup.prettify())
+            logging.debug('Fctables HTML snippet: ' + soup.prettify()[:2000])
+        return list(fixtures)
+    except Exception as e:
+        logging.warning(f"❌ Fctables error: {e}")
+        return []
+
+def get_fixtures_footystats():
+    url = 'https://footystats.org/england/premier-league/fixtures'
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+    try:
+        resp = requests.get(url, headers=headers, timeout=10)
+        soup = BeautifulSoup(resp.text, 'html.parser')
+        fixtures = set()
+        for row in soup.find_all('tr'):
+            teams = row.find_all('a', href=re.compile(r'/teams/'))
+            if len(teams) == 2:
+                home = clean_team_name(teams[0].get_text(strip=True))
+                away = clean_team_name(teams[1].get_text(strip=True))
+                if home and away and home != away:
+                    fixtures.add((home, away))
+        if not fixtures:
+            with open('debug_footystats.html', 'w') as f:
+                f.write(soup.prettify())
+            logging.debug('Footystats HTML snippet: ' + soup.prettify()[:2000])
+        return list(fixtures)
+    except Exception as e:
+        logging.warning(f"❌ Footystats error: {e}")
+        return []
+
+def get_fixtures_bettingodds():
+    url = 'https://www.bettingodds.com/football/english-premier-league'
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+    try:
+        resp = requests.get(url, headers=headers, timeout=10)
+        soup = BeautifulSoup(resp.text, 'html.parser')
+        fixtures = set()
+        for match in soup.find_all('div', class_='event-row'):
+            teams = match.find_all('span', class_='event-row__name')
+            if len(teams) == 2:
+                home = clean_team_name(teams[0].get_text(strip=True))
+                away = clean_team_name(teams[1].get_text(strip=True))
+                if home and away and home != away:
+                    fixtures.add((home, away))
+        if not fixtures:
+            with open('debug_bettingodds.html', 'w') as f:
+                f.write(soup.prettify())
+            logging.debug('BettingOdds HTML snippet: ' + soup.prettify()[:2000])
+        return list(fixtures)
+    except Exception as e:
+        logging.warning(f"❌ BettingOdds error: {e}")
+        return []
+
+def get_fixtures_windrawwin():
+    url = 'https://www.windrawwin.com/fixtures/england-premier-league/'
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+    try:
+        resp = requests.get(url, headers=headers, timeout=10)
+        soup = BeautifulSoup(resp.text, 'html.parser')
+        fixtures = set()
+        for match in soup.find_all('div', class_='fixturerow'):
+            teams = match.find_all('span', class_='teamname')
+            if len(teams) == 2:
+                home = clean_team_name(teams[0].get_text(strip=True))
+                away = clean_team_name(teams[1].get_text(strip=True))
+                if home and away and home != away:
+                    fixtures.add((home, away))
+        if not fixtures:
+            with open('debug_windrawwin.html', 'w') as f:
+                f.write(soup.prettify())
+            logging.debug('WinDrawWin HTML snippet: ' + soup.prettify()[:2000])
+        return list(fixtures)
+    except Exception as e:
+        logging.warning(f"❌ WinDrawWin error: {e}")
+        return []
+
+# --- Odds with undetected-chromedriver ---
+try:
+    import undetected_chromedriver as uc
+except ImportError:
+    uc = None
 
 def scrape_odds_oddschecker(driver, home_team, away_team):
     slug = create_match_slug(home_team, away_team)
@@ -418,64 +540,88 @@ def scrape_odds_windrawwin(driver, home_team, away_team):
         return odds
     return {}
 
-# --- Odds with undetected-chromedriver ---
-try:
-    import undetected_chromedriver as uc
-except ImportError:
-    uc = None
-
-def scrape_odds_oddschecker_uc(home_team, away_team):
-    if uc is None:
-        logging.warning("undetected-chromedriver not installed, skipping oddschecker_uc")
-        return {}
-    options = uc.ChromeOptions()
-    options.headless = True
+# --- Odds Sources ---
+def scrape_odds_windrawwin_requests(home_team, away_team):
+    url = 'https://www.windrawwin.com/fixtures/england-premier-league/'
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
     try:
-        driver = uc.Chrome(options=options)
-        slug = create_match_slug(home_team, away_team)
-        url = f'https://www.oddschecker.com/football/english/premier-league/{slug}/correct-score'
-        driver.get(url)
-        time.sleep(3)
-        soup = BeautifulSoup(driver.page_source, 'html.parser')
+        resp = requests.get(url, headers=headers, timeout=10)
+        soup = BeautifulSoup(resp.text, 'html.parser')
+        odds = {}
+        for match in soup.find_all('div', class_='fixturerow'):
+            text = match.get_text()
+            if home_team in text and away_team in text:
+                for score in re.findall(r'(\d+-\d+)', text):
+                    odd = re.search(rf'{score}\s+(\d+\.\d+)', text)
+                    if odd:
+                        odds[score] = float(odd.group(1))
+        return odds
+    except Exception as e:
+        logging.warning(f"WinDrawWin odds error: {e}")
+        return {}
+
+def scrape_odds_betexplorer_requests(home_team, away_team):
+    url = 'https://www.betexplorer.com/soccer/england/premier-league/'
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+    try:
+        resp = requests.get(url, headers=headers, timeout=10)
+        soup = BeautifulSoup(resp.text, 'html.parser')
         odds = {}
         for row in soup.find_all('tr'):
-            cells = row.find_all('td')
-            if len(cells) >= 2:
-                score = cells[0].get_text(strip=True)
-                odd = cells[1].get_text(strip=True)
-                if re.match(r'\d+-\d+', score) and re.match(r'\d+\.\d+', odd):
-                    odds[score] = float(odd)
-        driver.quit()
-        if odds:
-            return odds
+            text = row.get_text()
+            if home_team in text and away_team in text:
+                for cell in row.find_all('td'):
+                    m = re.match(r'(\d+-\d+)', cell.get_text())
+                    if m:
+                        score = m.group(1)
+                        odd = cell.find_next('td').get_text()
+                        if re.match(r'\d+\.\d+', odd):
+                            odds[score] = float(odd)
+        return odds
     except Exception as e:
-        logging.warning(f"Oddschecker (uc) error for {home_team} vs {away_team}: {e}")
-    return {}
+        logging.warning(f"Betexplorer odds error: {e}")
+        return {}
 
-def scrape_betting_odds(driver, home_team, away_team):
-    for source, func in [
-        ("Oddschecker (uc)", scrape_odds_oddschecker_uc),
-        ("Oddschecker", scrape_odds_oddschecker),
-        ("OddsPortal", scrape_odds_oddsportal),
-        ("SkyBet", scrape_odds_skybet),
-        ("Betexplorer", scrape_odds_betexplorer),
-        ("WinDrawWin", scrape_odds_windrawwin)
-    ]:
-        try:
-            if source == "Oddschecker (uc)":
-                odds = func(home_team, away_team)
-            else:
-                odds = func(driver, home_team, away_team)
-            if odds:
-                logging.info(f"✅ {home_team} vs {away_team}: {len(odds)} real odds scraped from {source}")
-                return odds
-            else:
-                logging.warning(f"❌ {home_team} vs {away_team}: No odds found from {source}")
-        except Exception as e:
-            logging.warning(f"❌ {home_team} vs {away_team}: {source} error: {e}")
-        time.sleep(2)
-    logging.warning(f"❌ {home_team} vs {away_team}: No real odds found - SKIPPED")
-    return {}
+def scrape_odds_bettingodds_requests(home_team, away_team):
+    url = 'https://www.bettingodds.com/football/english-premier-league'
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+    try:
+        resp = requests.get(url, headers=headers, timeout=10)
+        soup = BeautifulSoup(resp.text, 'html.parser')
+        odds = {}
+        for match in soup.find_all('div', class_='event-row'):
+            text = match.get_text()
+            if home_team in text and away_team in text:
+                for score in re.findall(r'(\d+-\d+)', text):
+                    odd = re.search(rf'{score}\s+(\d+\.\d+)', text)
+                    if odd:
+                        odds[score] = float(odd.group(1))
+        return odds
+    except Exception as e:
+        logging.warning(f"BettingOdds odds error: {e}")
+        return {}
+
+def scrape_odds_oddsportal_requests(home_team, away_team):
+    url = 'https://www.oddsportal.com/football/england/premier-league/'
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+    try:
+        resp = requests.get(url, headers=headers, timeout=10)
+        soup = BeautifulSoup(resp.text, 'html.parser')
+        odds = {}
+        for row in soup.find_all('tr'):
+            text = row.get_text()
+            if home_team in text and away_team in text:
+                for cell in row.find_all('td'):
+                    m = re.match(r'(\d+-\d+)', cell.get_text())
+                    if m:
+                        score = m.group(1)
+                        odd = cell.find_next('td').get_text()
+                        if re.match(r'\d+\.\d+', odd):
+                            odds[score] = float(odd)
+        return odds
+    except Exception as e:
+        logging.warning(f"Oddsportal odds error: {e}")
+        return {}
 
 # --- Main Script ---
 def main():
