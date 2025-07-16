@@ -102,10 +102,17 @@ def get_fixtures_bbc(driver):
     time.sleep(3)
     soup = BeautifulSoup(driver.page_source, 'html.parser')
     fixtures = set()
-    for match in soup.find_all(['span', 'div'], string=re.compile(r'vs|v| - |–|-|—', re.I)):
-        teams = extract_teams_from_text(match.get_text())
-        if teams:
-            fixtures.add(tuple(teams))
+    # BBC Sport: look for fixtures in the new structure
+    for section in soup.find_all('section', {'class': 'qa-match-block'}):
+        for match in section.find_all('div', {'class': 'sp-c-fixture'}):
+            teams = match.find_all('span', {'class': 'sp-c-fixture__team-name'})
+            if len(teams) == 2:
+                home = clean_team_name(teams[0].get_text())
+                away = clean_team_name(teams[1].get_text())
+                if home and away and home != away:
+                    fixtures.add((home, away))
+    if not fixtures:
+        logging.debug('BBC HTML snippet: ' + soup.prettify()[:2000])
     return list(fixtures)
 
 def get_fixtures_espn(driver):
@@ -114,13 +121,17 @@ def get_fixtures_espn(driver):
     time.sleep(3)
     soup = BeautifulSoup(driver.page_source, 'html.parser')
     fixtures = set()
-    for row in soup.find_all('tr'):
-        tds = row.find_all('td')
-        if len(tds) >= 2:
-            home = clean_team_name(tds[0].get_text())
-            away = clean_team_name(tds[1].get_text())
-            if home and away and home != away:
-                fixtures.add((home, away))
+    # ESPN: look for team names in the new structure
+    for table in soup.find_all('table'):
+        for row in table.find_all('tr'):
+            tds = row.find_all('td')
+            if len(tds) >= 2:
+                home = clean_team_name(tds[0].get_text())
+                away = clean_team_name(tds[1].get_text())
+                if home and away and home != away:
+                    fixtures.add((home, away))
+    if not fixtures:
+        logging.debug('ESPN HTML snippet: ' + soup.prettify()[:2000])
     return list(fixtures)
 
 def get_fixtures_skysports(driver):
@@ -129,18 +140,44 @@ def get_fixtures_skysports(driver):
     time.sleep(3)
     soup = BeautifulSoup(driver.page_source, 'html.parser')
     fixtures = set()
-    for match in soup.find_all('span', class_='matches__item-col teams'):  # SkySports structure
-        text = match.get_text()
-        teams = extract_teams_from_text(text)
-        if teams:
-            fixtures.add(tuple(teams))
+    # Sky Sports: look for fixtures in the new structure
+    for match in soup.find_all('span', class_='matches__item-col--team-name'):
+        # Each match is two consecutive spans
+        home = clean_team_name(match.get_text())
+        away_span = match.find_next_sibling('span', class_='matches__item-col--team-name')
+        if away_span:
+            away = clean_team_name(away_span.get_text())
+            if home and away and home != away:
+                fixtures.add((home, away))
+    if not fixtures:
+        logging.debug('SkySports HTML snippet: ' + soup.prettify()[:2000])
+    return list(fixtures)
+
+def get_fixtures_premierleague(driver):
+    url = 'https://www.premierleague.com/fixtures'
+    driver.get(url)
+    time.sleep(5)
+    soup = BeautifulSoup(driver.page_source, 'html.parser')
+    fixtures = set()
+    # Premier League: look for fixtures in the JS-rendered structure
+    for match in soup.find_all('div', class_='fixtures__matches-list'):
+        for fixture in match.find_all('li', class_='matchFixtureContainer'):
+            teams = fixture.find_all('span', class_='fixtures__team-name')
+            if len(teams) == 2:
+                home = clean_team_name(teams[0].get_text())
+                away = clean_team_name(teams[1].get_text())
+                if home and away and home != away:
+                    fixtures.add((home, away))
+    if not fixtures:
+        logging.debug('PL HTML snippet: ' + soup.prettify()[:2000])
     return list(fixtures)
 
 def get_real_fixtures(driver):
     for source, func in [
         ("BBC Sport", get_fixtures_bbc),
         ("ESPN", get_fixtures_espn),
-        ("Sky Sports", get_fixtures_skysports)
+        ("Sky Sports", get_fixtures_skysports),
+        ("Premier League", get_fixtures_premierleague)
     ]:
         try:
             fixtures = func(driver)
