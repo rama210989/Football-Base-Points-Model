@@ -6,6 +6,8 @@ from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import TimeoutException, NoSuchElementException, WebDriverException
 from bs4 import BeautifulSoup
+import requests
+import cloudscraper
 
 # Premier League teams for 2023/24
 PREMIER_LEAGUE_TEAMS = {
@@ -214,17 +216,96 @@ def get_fixtures_soccerway(driver):
         logging.debug('Soccerway HTML snippet: ' + soup.prettify()[:2000])
     return list(fixtures)
 
+def get_fixtures_flashscore_requests():
+    url = 'https://www.flashscore.com/football/england/premier-league/fixtures/'
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+    }
+    try:
+        resp = requests.get(url, headers=headers, timeout=10)
+        soup = BeautifulSoup(resp.text, 'html.parser')
+        fixtures = set()
+        for row in soup.find_all('div', class_='event__match'):
+            home = row.find('div', class_='event__participant--home')
+            away = row.find('div', class_='event__participant--away')
+            if home and away:
+                home_team = clean_team_name(home.get_text(strip=True))
+                away_team = clean_team_name(away.get_text(strip=True))
+                if home_team and away_team and home_team != away_team:
+                    fixtures.add((home_team, away_team))
+        if not fixtures:
+            logging.debug('Flashscore (requests) HTML snippet: ' + soup.prettify()[:2000])
+        return list(fixtures)
+    except Exception as e:
+        logging.warning(f"❌ Flashscore (requests) error: {e}")
+        return []
+
+def get_fixtures_soccerway_requests():
+    url = 'https://int.soccerway.com/national/england/premier-league/20232024/regular-season/r75134/'
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+    }
+    try:
+        resp = requests.get(url, headers=headers, timeout=10)
+        soup = BeautifulSoup(resp.text, 'html.parser')
+        fixtures = set()
+        for row in soup.find_all('tr', class_='match played no-date-repetition'):
+            teams = row.find_all('td', class_='team')
+            if len(teams) == 2:
+                home_team = clean_team_name(teams[0].get_text(strip=True))
+                away_team = clean_team_name(teams[1].get_text(strip=True))
+                if home_team and away_team and home_team != away_team:
+                    fixtures.add((home_team, away_team))
+        for row in soup.find_all('tr', class_='match no-date-repetition'):
+            teams = row.find_all('td', class_='team')
+            if len(teams) == 2:
+                home_team = clean_team_name(teams[0].get_text(strip=True))
+                away_team = clean_team_name(teams[1].get_text(strip=True))
+                if home_team and away_team and home_team != away_team:
+                    fixtures.add((home_team, away_team))
+        if not fixtures:
+            logging.debug('Soccerway (requests) HTML snippet: ' + soup.prettify()[:2000])
+        return list(fixtures)
+    except Exception as e:
+        logging.warning(f"❌ Soccerway (requests) error: {e}")
+        return []
+
+def get_fixtures_flashscore_cloudscraper():
+    url = 'https://www.flashscore.com/football/england/premier-league/fixtures/'
+    try:
+        scraper = cloudscraper.create_scraper()
+        resp = scraper.get(url, timeout=10)
+        soup = BeautifulSoup(resp.text, 'html.parser')
+        fixtures = set()
+        for row in soup.find_all('div', class_='event__match'):
+            home = row.find('div', class_='event__participant--home')
+            away = row.find('div', class_='event__participant--away')
+            if home and away:
+                home_team = clean_team_name(home.get_text(strip=True))
+                away_team = clean_team_name(away.get_text(strip=True))
+                if home_team and away_team and home_team != away_team:
+                    fixtures.add((home_team, away_team))
+        if not fixtures:
+            logging.debug('Flashscore (cloudscraper) HTML snippet: ' + soup.prettify()[:2000])
+        return list(fixtures)
+    except Exception as e:
+        logging.warning(f"❌ Flashscore (cloudscraper) error: {e}")
+        return []
+
 def get_real_fixtures(driver):
     for source, func in [
+        ("Flashscore (requests)", get_fixtures_flashscore_requests),
+        ("Soccerway (requests)", get_fixtures_soccerway_requests),
+        ("Flashscore (cloudscraper)", get_fixtures_flashscore_cloudscraper),
         ("BBC Sport", get_fixtures_bbc),
         ("ESPN", get_fixtures_espn),
         ("Sky Sports", get_fixtures_skysports),
         ("Premier League", get_fixtures_premierleague),
-        ("Flashscore", get_fixtures_flashscore),
-        ("Soccerway", get_fixtures_soccerway)
+        ("Flashscore (selenium)", get_fixtures_flashscore),
+        ("Soccerway (selenium)", get_fixtures_soccerway)
     ]:
         try:
-            fixtures = func(driver)
+            fixtures = func() if 'requests' in source or 'cloudscraper' in source else func(driver)
             real_fixtures = [f for f in fixtures if f[0] in PREMIER_LEAGUE_TEAMS and f[1] in PREMIER_LEAGUE_TEAMS]
             if real_fixtures:
                 logging.info(f"✅ Found {len(real_fixtures)} real fixtures from {source}")
@@ -337,8 +418,43 @@ def scrape_odds_windrawwin(driver, home_team, away_team):
         return odds
     return {}
 
+# --- Odds with undetected-chromedriver ---
+try:
+    import undetected_chromedriver as uc
+except ImportError:
+    uc = None
+
+def scrape_odds_oddschecker_uc(home_team, away_team):
+    if uc is None:
+        logging.warning("undetected-chromedriver not installed, skipping oddschecker_uc")
+        return {}
+    options = uc.ChromeOptions()
+    options.headless = True
+    try:
+        driver = uc.Chrome(options=options)
+        slug = create_match_slug(home_team, away_team)
+        url = f'https://www.oddschecker.com/football/english/premier-league/{slug}/correct-score'
+        driver.get(url)
+        time.sleep(3)
+        soup = BeautifulSoup(driver.page_source, 'html.parser')
+        odds = {}
+        for row in soup.find_all('tr'):
+            cells = row.find_all('td')
+            if len(cells) >= 2:
+                score = cells[0].get_text(strip=True)
+                odd = cells[1].get_text(strip=True)
+                if re.match(r'\d+-\d+', score) and re.match(r'\d+\.\d+', odd):
+                    odds[score] = float(odd)
+        driver.quit()
+        if odds:
+            return odds
+    except Exception as e:
+        logging.warning(f"Oddschecker (uc) error for {home_team} vs {away_team}: {e}")
+    return {}
+
 def scrape_betting_odds(driver, home_team, away_team):
     for source, func in [
+        ("Oddschecker (uc)", scrape_odds_oddschecker_uc),
         ("Oddschecker", scrape_odds_oddschecker),
         ("OddsPortal", scrape_odds_oddsportal),
         ("SkyBet", scrape_odds_skybet),
@@ -346,7 +462,10 @@ def scrape_betting_odds(driver, home_team, away_team):
         ("WinDrawWin", scrape_odds_windrawwin)
     ]:
         try:
-            odds = func(driver, home_team, away_team)
+            if source == "Oddschecker (uc)":
+                odds = func(home_team, away_team)
+            else:
+                odds = func(driver, home_team, away_team)
             if odds:
                 logging.info(f"✅ {home_team} vs {away_team}: {len(odds)} real odds scraped from {source}")
                 return odds
