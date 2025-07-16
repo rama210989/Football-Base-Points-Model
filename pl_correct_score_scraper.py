@@ -172,12 +172,56 @@ def get_fixtures_premierleague(driver):
         logging.debug('PL HTML snippet: ' + soup.prettify()[:2000])
     return list(fixtures)
 
+def get_fixtures_flashscore(driver):
+    url = 'https://www.flashscore.com/football/england/premier-league/fixtures/'
+    driver.get(url)
+    time.sleep(5)
+    soup = BeautifulSoup(driver.page_source, 'html.parser')
+    fixtures = set()
+    for row in soup.find_all('div', class_='event__match'):
+        home = row.find('div', class_='event__participant--home')
+        away = row.find('div', class_='event__participant--away')
+        if home and away:
+            home_team = clean_team_name(home.get_text())
+            away_team = clean_team_name(away.get_text())
+            if home_team and away_team and home_team != away_team:
+                fixtures.add((home_team, away_team))
+    if not fixtures:
+        logging.debug('Flashscore HTML snippet: ' + soup.prettify()[:2000])
+    return list(fixtures)
+
+def get_fixtures_soccerway(driver):
+    url = 'https://int.soccerway.com/national/england/premier-league/20232024/regular-season/r75134/'
+    driver.get(url)
+    time.sleep(5)
+    soup = BeautifulSoup(driver.page_source, 'html.parser')
+    fixtures = set()
+    for row in soup.find_all('tr', class_='match played no-date-repetition'):
+        teams = row.find_all('td', class_='team')
+        if len(teams) == 2:
+            home_team = clean_team_name(teams[0].get_text())
+            away_team = clean_team_name(teams[1].get_text())
+            if home_team and away_team and home_team != away_team:
+                fixtures.add((home_team, away_team))
+    for row in soup.find_all('tr', class_='match no-date-repetition'):
+        teams = row.find_all('td', class_='team')
+        if len(teams) == 2:
+            home_team = clean_team_name(teams[0].get_text())
+            away_team = clean_team_name(teams[1].get_text())
+            if home_team and away_team and home_team != away_team:
+                fixtures.add((home_team, away_team))
+    if not fixtures:
+        logging.debug('Soccerway HTML snippet: ' + soup.prettify()[:2000])
+    return list(fixtures)
+
 def get_real_fixtures(driver):
     for source, func in [
         ("BBC Sport", get_fixtures_bbc),
         ("ESPN", get_fixtures_espn),
         ("Sky Sports", get_fixtures_skysports),
-        ("Premier League", get_fixtures_premierleague)
+        ("Premier League", get_fixtures_premierleague),
+        ("Flashscore", get_fixtures_flashscore),
+        ("Soccerway", get_fixtures_soccerway)
     ]:
         try:
             fixtures = func(driver)
@@ -256,11 +300,50 @@ def scrape_odds_skybet(driver, home_team, away_team):
         logging.warning(f"SkyBet error for {home_team} vs {away_team}: {e}")
     return {}
 
+def scrape_odds_betexplorer(driver, home_team, away_team):
+    url = 'https://www.betexplorer.com/soccer/england/premier-league/'
+    driver.get(url)
+    time.sleep(5)
+    soup = BeautifulSoup(driver.page_source, 'html.parser')
+    odds = {}
+    for row in soup.find_all('tr'):
+        text = row.get_text()
+        if home_team in text and away_team in text:
+            for cell in row.find_all('td'):
+                m = re.match(r'(\d+-\d+)', cell.get_text())
+                if m:
+                    score = m.group(1)
+                    odd = cell.find_next('td').get_text()
+                    if re.match(r'\d+\.\d+', odd):
+                        odds[score] = float(odd)
+    if odds:
+        return odds
+    return {}
+
+def scrape_odds_windrawwin(driver, home_team, away_team):
+    url = 'https://www.windrawwin.com/fixtures/england-premier-league/'
+    driver.get(url)
+    time.sleep(5)
+    soup = BeautifulSoup(driver.page_source, 'html.parser')
+    odds = {}
+    for match in soup.find_all('div', class_='fixturerow'):
+        text = match.get_text()
+        if home_team in text and away_team in text:
+            for score in re.findall(r'(\d+-\d+)', text):
+                odd = re.search(rf'{score}\s+(\d+\.\d+)', text)
+                if odd:
+                    odds[score] = float(odd.group(1))
+    if odds:
+        return odds
+    return {}
+
 def scrape_betting_odds(driver, home_team, away_team):
     for source, func in [
         ("Oddschecker", scrape_odds_oddschecker),
         ("OddsPortal", scrape_odds_oddsportal),
-        ("SkyBet", scrape_odds_skybet)
+        ("SkyBet", scrape_odds_skybet),
+        ("Betexplorer", scrape_odds_betexplorer),
+        ("WinDrawWin", scrape_odds_windrawwin)
     ]:
         try:
             odds = func(driver, home_team, away_team)
