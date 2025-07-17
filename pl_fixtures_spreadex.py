@@ -15,7 +15,7 @@ PREMIER_LEAGUE_TEAMS = {
     "Arsenal", "Liverpool", "Manchester City", "Chelsea", "Newcastle United",
     "Manchester United", "Tottenham", "Brighton", "Aston Villa", "West Ham United",
     "Crystal Palace", "Fulham", "Brentford", "Wolverhampton", "Everton",
-    "Bournemouth", "Nottingham Forest", "Burnley", "Sheffield United", "Luton Town"
+    "Bournemouth", "Nottingham Forest", "Burnley", "Leeds United", "Sunderland"
 }
 
 TEAM_ALIASES = {
@@ -39,6 +39,8 @@ TEAM_ALIASES = {
     "Chelsea": "Chelsea",
     "Arsenal": "Arsenal",
     "Liverpool": "Liverpool",
+    "Leeds": "Leeds United",
+    "Sunderland": "Sunderland"
 }
 
 def clean_team_name(name):
