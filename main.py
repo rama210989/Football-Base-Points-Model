@@ -1,6 +1,5 @@
 import asyncio
 from playwright.async_api import async_playwright
-import requests
 import csv
 import logging
 import sys
@@ -12,103 +11,123 @@ logging.basicConfig(
     handlers=[logging.StreamHandler(sys.stdout)]
 )
 
-ODDS_URL_TEMPLATE = "https://global.ds.lsapp.eu/odds/pq_graphql?_hash=oce&eventId={}&projectId=26&geoIpCode=IN&geoIpSubdivisionCode=INTN"
-FIXTURES_URL = "https://www.flashscore.in/football/england/premier-league/fixtures/"
-CSV_FILE = "premier_league_fixtures_and_odds.csv"
+FIXTURES_URL = "https://www.spreadex.com/sports/en-GB/spread-betting/football/league/47/fo/c66"
+BASE_URL = "https://www.spreadex.com"
+CSV_FILE = "spreadex_premier_league_correct_score_odds.csv"
 
-async def get_fixtures():
+async def get_fixture_links(page):
+    await page.goto(FIXTURES_URL, timeout=60000)
+    await page.wait_for_timeout(5000)  # Wait for JS to load
+    # Find all fixture links (those that go to a match odds page)
+    links = await page.query_selector_all('a[href*="/spread-betting/football/premier-league/"][href*="/fo/p"]')
+    fixtures = []
+    seen = set()
+    for a in links:
+        href = await a.get_attribute('href')
+        text = await a.inner_text()
+        if not href or not text:
+            continue
+        # Only keep unique fixtures
+        if href in seen:
+            continue
+        seen.add(href)
+        # Try to extract home and away from the URL or text
+        # URL: .../premier-league/home-v-away/fo/pXXXXXXX
+        parts = href.split('/')
+        if len(parts) > 6 and '-v-' in parts[-3]:
+            teams = parts[-3].split('-v-')
+            home = teams[0].replace('-', ' ').title()
+            away = teams[1].replace('-', ' ').title()
+        else:
+            # fallback: use text
+            if ' v ' in text:
+                home, away = text.split(' v ', 1)
+            else:
+                continue
+        fixtures.append({'url': BASE_URL + href, 'home': home.strip(), 'away': away.strip()})
+    logging.info(f"Found {len(fixtures)} fixture links.")
+    return fixtures
+
+async def get_correct_score_odds(page, fixture):
+    url = fixture['url']
+    home = fixture['home']
+    away = fixture['away']
+    try:
+        await page.goto(url, timeout=60000)
+        await page.wait_for_timeout(5000)
+        # Try to find the 'Correct Score' tab/button and click it if needed
+        # This selector may need adjustment if Spreadex changes their UI
+        tab = await page.query_selector('button:has-text("Correct Score")')
+        if tab:
+            await tab.click()
+            await page.wait_for_timeout(2000)
+        # Odds are usually in a table or list under the correct score section
+        odds = []
+        # Try to find all rows with score and odds
+        rows = await page.query_selector_all('[data-testid*="correct-score"] [data-testid*="selection-row"]')
+        if not rows:
+            # fallback: try to find any table rows with score/odds
+            rows = await page.query_selector_all('tr')
+        for row in rows:
+            # Try to extract score and odds from the row
+            score = None
+            odds_val = None
+            # Try to get all text in the row
+            cells = await row.query_selector_all('td, div')
+            texts = [await c.inner_text() for c in cells]
+            # Heuristic: look for a cell with a score pattern (e.g., 2-1, 1-0, etc.)
+            for t in texts:
+                if t and (':' in t or '-' in t) and any(char.isdigit() for char in t):
+                    score = t.replace(':', '-').strip()
+                    break
+            # Heuristic: odds are usually a float or fraction, last cell
+            for t in reversed(texts):
+                if t and ('.' in t or '/' in t):
+                    odds_val = t.strip()
+                    break
+            if score and odds_val:
+                odds.append({'score': score, 'odds': odds_val})
+        return odds
+    except Exception as e:
+        logging.warning(f"Failed to fetch odds for {home} vs {away}: {e}")
+        return []
+
+async def main_async():
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         page = await browser.new_page()
-        logging.info(f"Navigating to {FIXTURES_URL}")
-        await page.goto(FIXTURES_URL, timeout=60000)
-        # Dump the loaded HTML for debugging
-        html = await page.content()
-        with open("debug_flashscore.html", "w", encoding="utf-8") as f:
-            f.write(html)
-        logging.info("Saved loaded HTML to debug_flashscore.html")
-        print(html[:2000])  # Print the first 2000 characters to the logs
-        # Optionally, wait a bit for JS to load
-        await page.wait_for_timeout(5000)
-        try:
-            await page.wait_for_selector('a[href^="/match/"]', timeout=10000)
-        except Exception as e:
-            logging.error(f"Selector for match links not found: {e}")
-            return []
-        links = await page.query_selector_all('a[href^="/match/"]')
-        fixtures = []
-        seen = set()
-        for a in links:
-            href = await a.get_attribute('href')
-            text = await a.inner_text()
-            if not href or not text or ' - ' not in text:
-                continue
-            event_id = href.split('/')[2]
-            home, away = text.split(' - ', 1)
-            key = (event_id, home.strip(), away.strip())
-            if key in seen:
-                continue
-            seen.add(key)
-            fixtures.append({'event_id': event_id, 'home': home.strip(), 'away': away.strip()})
+        fixtures = await get_fixture_links(page)
+        all_rows = []
+        for fixture in fixtures:
+            home = fixture['home']
+            away = fixture['away']
+            odds = await get_correct_score_odds(page, fixture)
+            print(f"\n{home} vs {away}")
+            if odds:
+                for line in odds:
+                    print(f"  {line['score']}: {line['odds']}")
+                    all_rows.append({
+                        'home': home,
+                        'away': away,
+                        'score': line['score'],
+                        'odds': line['odds']
+                    })
+            else:
+                print("  No correct score odds found or market not available.")
+            time.sleep(1)  # Be polite to the server
         await browser.close()
-        logging.info(f"Found {len(fixtures)} fixtures with event IDs.")
-        if not fixtures:
-            logging.warning("No fixtures found. Check debug_flashscore.html for clues (Cloudflare, empty, etc.)")
-        return fixtures
-
-def fetch_correct_score_odds(event_id):
-    url = ODDS_URL_TEMPLATE.format(event_id)
-    try:
-        resp = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
-        resp.raise_for_status()
-        data = resp.json()
-        odds_data = data.get('data', {}).get('eventOdds', [])
-        for market in odds_data:
-            if market.get('bettingType') == 'CORRECT_SCORE' and market.get('bettingScope') == 'FULL_TIME':
-                odds = market.get('odds', [])
-                odds_lines = []
-                for item in odds:
-                    score = item.get('score')
-                    value = item.get('value')
-                    if score and value:
-                        odds_lines.append({'score': score, 'odds': value})
-                return odds_lines
-        return []
-    except Exception as e:
-        logging.warning(f"Failed to fetch odds for event ID {event_id}: {e}")
-        return []
+        # Write to CSV
+        if all_rows:
+            with open(CSV_FILE, 'w', newline='', encoding='utf-8') as csvfile:
+                writer = csv.DictWriter(csvfile, fieldnames=['home', 'away', 'score', 'odds'])
+                writer.writeheader()
+                writer.writerows(all_rows)
+            print(f"\nResults saved to {CSV_FILE}")
+        else:
+            print("\nNo odds data to save.")
 
 def main():
-    fixtures = asyncio.run(get_fixtures())
-    all_rows = []
-    for f in fixtures:
-        home = f['home']
-        away = f['away']
-        event_id = f['event_id']
-        print(f"\n{home} vs {away} (Event ID: {event_id})")
-        odds = fetch_correct_score_odds(event_id)
-        if odds:
-            for line in odds:
-                print(f"  {line['score']}: {line['odds']}")
-                all_rows.append({
-                    'home': home,
-                    'away': away,
-                    'event_id': event_id,
-                    'score': line['score'],
-                    'odds': line['odds']
-                })
-        else:
-            print("  No correct score odds found or market not available.")
-        time.sleep(1)  # Be polite to the server
-    # Write to CSV
-    if all_rows:
-        with open(CSV_FILE, 'w', newline='', encoding='utf-8') as csvfile:
-            writer = csv.DictWriter(csvfile, fieldnames=['home', 'away', 'event_id', 'score', 'odds'])
-            writer.writeheader()
-            writer.writerows(all_rows)
-        print(f"\nResults saved to {CSV_FILE}")
-    else:
-        print("\nNo odds data to save.")
+    asyncio.run(main_async())
 
 if __name__ == "__main__":
     main()
