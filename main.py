@@ -27,6 +27,7 @@ async def get_fixtures():
         with open("debug_flashscore.html", "w", encoding="utf-8") as f:
             f.write(html)
         logging.info("Saved loaded HTML to debug_flashscore.html")
+        print(html[:2000])  # Print the first 2000 characters to the logs
         # Optionally, wait a bit for JS to load
         await page.wait_for_timeout(5000)
         try:
