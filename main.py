@@ -20,8 +20,20 @@ async def get_fixtures():
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         page = await browser.new_page()
+        logging.info(f"Navigating to {FIXTURES_URL}")
         await page.goto(FIXTURES_URL, timeout=60000)
-        await page.wait_for_selector('a[href^="/match/"]', timeout=30000)
+        # Dump the loaded HTML for debugging
+        html = await page.content()
+        with open("debug_flashscore.html", "w", encoding="utf-8") as f:
+            f.write(html)
+        logging.info("Saved loaded HTML to debug_flashscore.html")
+        # Optionally, wait a bit for JS to load
+        await page.wait_for_timeout(5000)
+        try:
+            await page.wait_for_selector('a[href^="/match/"]', timeout=10000)
+        except Exception as e:
+            logging.error(f"Selector for match links not found: {e}")
+            return []
         links = await page.query_selector_all('a[href^="/match/"]')
         fixtures = []
         seen = set()
@@ -39,6 +51,8 @@ async def get_fixtures():
             fixtures.append({'event_id': event_id, 'home': home.strip(), 'away': away.strip()})
         await browser.close()
         logging.info(f"Found {len(fixtures)} fixtures with event IDs.")
+        if not fixtures:
+            logging.warning("No fixtures found. Check debug_flashscore.html for clues (Cloudflare, empty, etc.)")
         return fixtures
 
 def fetch_correct_score_odds(event_id):
