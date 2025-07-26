@@ -1,0 +1,700 @@
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Football Odds Analyzer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: #2c3e50;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            margin-bottom: 10px;
+            font-size: 1.8em;
+        }
+        
+        .header p {
+            opacity: 0.9;
+            font-size: 0.9em;
+        }
+        
+        .content {
+            padding: 20px;
+        }
+        
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 2px solid #ecf0f1;
+            border-radius: 10px;
+            background: #fafafa;
+        }
+        
+        .section h2 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+            display: flex;
+            align-items: center;
+        }
+        
+        .section h2::before {
+            content: "⚽";
+            margin-right: 10px;
+            font-size: 1.2em;
+        }
+        
+        .input-group {
+            margin-bottom: 15px;
+        }
+        
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #34495e;
+        }
+        
+        .input-group input, .input-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #bdc3c7;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+        }
+        
+        .input-group input:focus, .input-group select:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+            border: none;
+            padding: 15px 25px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            margin-bottom: 10px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(52, 152, 219, 0.4);
+        }
+        
+        .btn:active {
+            transform: translateY(0);
+        }
+        
+        .btn:disabled {
+            background: #95a5a6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .btn-success {
+            background: linear-gradient(135deg, #27ae60, #229954);
+        }
+        
+        .btn-warning {
+            background: linear-gradient(135deg, #f39c12, #e67e22);
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+            color: #7f8c8d;
+        }
+        
+        .loading::after {
+            content: '';
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #bdc3c7;
+            border-radius: 50%;
+            border-top-color: #3498db;
+            animation: spin 1s ease-in-out infinite;
+            margin-left: 10px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .results {
+            margin-top: 20px;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            border-left: 4px solid #3498db;
+            display: none;
+        }
+        
+        .results h3 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        
+        .results pre {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-size: 14px;
+            white-space: pre-wrap;
+        }
+        
+        .error {
+            background: #e74c3c;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 10px;
+            display: none;
+        }
+        
+        .success {
+            background: #27ae60;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 10px;
+            display: none;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        
+        @media (max-width: 600px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+            
+            body {
+                padding: 10px;
+            }
+            
+            .content {
+                padding: 15px;
+            }
+            
+            .section {
+                padding: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>⚽ Football Odds Analyzer</h1>
+            <p>Get live odds, fixtures, and calculate probabilities</p>
+        </div>
+        
+        <div class="content">
+            <!-- Fixtures Section -->
+            <div class="section">
+                <h2>📅 Upcoming Fixtures</h2>
+                <div class="input-group">
+                    <label for="fixtureType">Fixture Type:</label>
+                    <select id="fixtureType" onchange="toggleFixtureInputs()">
+                        <option value="next">Next X fixtures (all leagues)</option>
+                        <option value="league">Fixtures for specific league</option>
+                        <option value="date">Fixtures for specific date</option>
+                    </select>
+                </div>
+                
+                <div id="nextFixturesInputs">
+                    <div class="input-group">
+                        <label for="fixtureCount">Number of fixtures to fetch:</label>
+                        <select id="fixtureCount">
+                            <option value="10">Next 10 fixtures</option>
+                            <option value="25" selected>Next 25 fixtures</option>
+                            <option value="50">Next 50 fixtures</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div id="leagueFixturesInputs" style="display: none;">
+                    <div class="input-group">
+                        <label for="leagueId">League ID (e.g., 39 for Premier League):</label>
+                        <input type="text" id="leagueId" placeholder="e.g., 39, 140, 78">
+                    </div>
+                    <div class="input-group">
+                        <label for="leagueFixtureCount">Number of fixtures:</label>
+                        <select id="leagueFixtureCount">
+                            <option value="10">Next 10 fixtures</option>
+                            <option value="25" selected>Next 25 fixtures</option>
+                            <option value="50">Next 50 fixtures</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div id="dateFixturesInputs" style="display: none;">
+                    <div class="input-group">
+                        <label for="fixtureDate">Date (YYYY-MM-DD):</label>
+                        <input type="date" id="fixtureDate">
+                    </div>
+                </div>
+                
+                <button class="btn" onclick="getFixtures()">Get Fixtures</button>
+                <div id="fixturesLoading" class="loading">Fetching fixtures...</div>
+                <div id="fixturesResults" class="results"></div>
+                <div id="fixturesError" class="error"></div>
+            </div>
+            
+            <!-- Odds Section -->
+            <div class="section">
+                <h2>💰 Get Odds for Match</h2>
+                <div class="input-group">
+                    <label for="fixtureId">Fixture ID:</label>
+                    <input type="text" id="fixtureId" placeholder="e.g., 1338466" value="1338466">
+                </div>
+                <div class="grid">
+                    <button class="btn btn-success" onclick="getOdds()">Get All Odds</button>
+                    <button class="btn btn-warning" onclick="calculateFinalScores()">Calculate Final Scores</button>
+                </div>
+                <div id="oddsLoading" class="loading">Fetching odds data...</div>
+                <div id="oddsResults" class="results"></div>
+                <div id="oddsError" class="error"></div>
+            </div>
+            
+            <!-- Leagues Section -->
+            <div class="section">
+                <h2>🏆 League Directory</h2>
+                <div class="input-group">
+                    <label for="leagueSeason">Season:</label>
+                    <select id="leagueSeason">
+                        <option value="2024">2024</option>
+                        <option value="2025" selected>2025</option>
+                    </select>
+                </div>
+                <button class="btn" onclick="getLeagues()">Get All Leagues</button>
+                <div id="leaguesLoading" class="loading">Fetching leagues...</div>
+                <div id="leaguesResults" class="results"></div>
+                <div id="leaguesError" class="error"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Utility functions
+        function toggleFixtureInputs() {
+            const type = document.getElementById('fixtureType').value;
+            
+            document.getElementById('nextFixturesInputs').style.display = type === 'next' ? 'block' : 'none';
+            document.getElementById('leagueFixturesInputs').style.display = type === 'league' ? 'block' : 'none';
+            document.getElementById('dateFixturesInputs').style.display = type === 'date' ? 'block' : 'none';
+        }
+        
+        function showLoading(id) {
+            document.getElementById(id).style.display = 'block';
+            hideResults(id.replace('Loading', ''));
+            hideError(id.replace('Loading', ''));
+        }
+        
+        function hideLoading(id) {
+            document.getElementById(id).style.display = 'none';
+        }
+        
+        function showResults(id, data) {
+            const element = document.getElementById(id);
+            
+            if (id === 'fixturesResults') {
+                element.innerHTML = formatFixturesTable(data);
+            } else if (id === 'oddsResults') {
+                element.innerHTML = formatOddsTable(data);
+            } else if (id === 'leaguesResults') {
+                element.innerHTML = formatLeaguesTable(data);
+            } else {
+                element.innerHTML = '<h3>Results:</h3><pre>' + JSON.stringify(data, null, 2) + '</pre>';
+            }
+            
+            element.style.display = 'block';
+        }
+        
+        function formatFixturesTable(data) {
+            if (data.error) return `<p style="color: red;">Error: ${data.error}</p>`;
+            
+            let title = `📅 Upcoming Fixtures (${data.total} total)`;
+            if (data.type === 'league') {
+                title = `📅 ${data.leagueName} Fixtures (${data.total} found)`;
+            } else if (data.type === 'date') {
+                title = `📅 Fixtures for ${data.searchDate} (${data.total} found)`;
+            }
+            
+            let html = `<h3>${title}</h3>`;
+            html += `<div style="overflow-x: auto;">`;
+            html += `<table style="width: 100%; border-collapse: collapse; margin-top: 10px;">`;
+            html += `<thead><tr style="background: #f1f3f4;">
+                        <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Fixture ID</th>
+                        <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Date</th>
+                        <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Time</th>
+                        <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Match</th>
+                        <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">League</th>
+                        <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Venue</th>
+                     </tr></thead><tbody>`;
+            
+            data.fixtures.forEach(fixture => {
+                html += `<tr style="border-bottom: 1px solid #eee;">
+                            <td style="padding: 8px; border: 1px solid #ddd; font-family: monospace; font-weight: bold; color: #1565c0;">${fixture.id}</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${fixture.date}</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${fixture.time}</td>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: 600;">${fixture.homeTeam} vs ${fixture.awayTeam}</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${fixture.league}</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${fixture.venue}</td>
+                         </tr>`;
+            });
+            
+            html += `</tbody></table></div>`;
+            return html;
+        }
+        
+        function formatOddsTable(data) {
+            if (data.error) return `<p style="color: red;">Error: ${data.error}</p>`;
+            
+            let html = `<h3>💰 Odds for Fixture ${data.fixtureId}</h3>`;
+            
+            // Final Scores Section (if it's calculation results)
+            if (data.finalScores) {
+                html += `<div style="margin-bottom: 20px;">`;
+                html += `<h4 style="color: #ff9900; margin-bottom: 10px;">🎯 Final Score Probabilities</h4>`;
+                html += `<div style="overflow-x: auto;">`;
+                html += `<table style="width: 100%; border-collapse: collapse;">`;
+                html += `<thead><tr style="background: #ff9900; color: white;">
+                            <th style="padding: 8px; border: 1px solid #ddd;">Final Score</th>
+                            <th style="padding: 8px; border: 1px solid #ddd;">Probability</th>
+                            <th style="padding: 8px; border: 1px solid #ddd;">Calculated Odds</th>
+                            <th style="padding: 8px; border: 1px solid #ddd;">Combinations</th>
+                         </tr></thead><tbody>`;
+                
+                data.finalScores.forEach(score => {
+                    html += `<tr style="border-bottom: 1px solid #eee;">
+                                <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; text-align: center;">${score.score}</td>
+                                <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${score.probability}</td>
+                                <td style="padding: 8px; border: 1px solid #ddd; text-align: center; font-weight: 600; color: #1565c0;">${score.odds}</td>
+                                <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${score.combinations}</td>
+                             </tr>`;
+                });
+                
+                html += `</tbody></table></div>`;
+                html += `<p style="margin-top: 10px; font-size: 0.9em; color: #666;">
+                            📊 Summary: ${data.summary.firstHalfScores} first half scores, ${data.summary.secondHalfScores} second half scores. 
+                            Total probability: ${data.summary.totalProbability}
+                         </p>`;
+                html += `</div>`;
+                return html;
+            }
+            
+            // Goal Scorers Section
+            if (data.goalScorers && data.goalScorers.length > 0) {
+                html += `<div style="margin-bottom: 20px;">`;
+                html += `<h4 style="color: #4285f4; margin-bottom: 10px;">⚽ Anytime Goal Scorers</h4>`;
+                html += `<div style="overflow-x: auto;">`;
+                html += `<table style="width: 100%; border-collapse: collapse;">`;
+                html += `<thead><tr style="background: #4285f4; color: white;">
+                            <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Player</th>
+                            <th style="padding: 8px; border: 1px solid #ddd; text-align: center;">Avg Odds</th>
+                            <th style="padding: 8px; border: 1px solid #ddd; text-align: center;">Bookmakers</th>
+                         </tr></thead><tbody>`;
+                
+                data.goalScorers.forEach(player => {
+                    html += `<tr style="border-bottom: 1px solid #eee;">
+                                <td style="padding: 8px; border: 1px solid #ddd; font-weight: 600;">${player.player}</td>
+                                <td style="padding: 8px; border: 1px solid #ddd; text-align: center; font-weight: bold; color: #1565c0;">${player.avgOdds}</td>
+                                <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${player.bookmakers}</td>
+                             </tr>`;
+                });
+                
+                html += `</tbody></table></div></div>`;
+            }
+            
+            // First Half Scores
+            if (data.firstHalfScores && data.firstHalfScores.length > 0) {
+                html += `<div style="margin-bottom: 20px;">`;
+                html += `<h4 style="color: #34a853; margin-bottom: 10px;">🕐 First Half Correct Scores</h4>`;
+                html += formatScoreTable(data.firstHalfScores, '#34a853');
+                html += `</div>`;
+            }
+            
+            // Second Half Scores
+            if (data.secondHalfScores && data.secondHalfScores.length > 0) {
+                html += `<div style="margin-bottom: 20px;">`;
+                html += `<h4 style="color: #ea4335; margin-bottom: 10px;">🕕 Second Half Correct Scores</h4>`;
+                html += formatScoreTable(data.secondHalfScores, '#ea4335');
+                html += `</div>`;
+            }
+            
+            // FIXED: Clean Sheet Home Section - Now properly implemented!
+            if (data.cleanSheetHome && data.cleanSheetHome.length > 0) {
+                html += `<div style="margin-bottom: 20px;">`;
+                html += `<h4 style="color: #9b59b6; margin-bottom: 10px;">🥅 Home Team Clean Sheet</h4>`;
+                html += formatCleanSheetTable(data.cleanSheetHome, '#9b59b6');
+                html += `</div>`;
+            }
+            
+            // FIXED: Clean Sheet Away Section - Now properly implemented!
+            if (data.cleanSheetAway && data.cleanSheetAway.length > 0) {
+                html += `<div style="margin-bottom: 20px;">`;
+                html += `<h4 style="color: #e67e22; margin-bottom: 10px;">🥅 Away Team Clean Sheet</h4>`;
+                html += formatCleanSheetTable(data.cleanSheetAway, '#e67e22');
+                html += `</div>`;
+            }
+            
+            return html;
+        }
+        
+        function formatScoreTable(scores, color) {
+            let html = `<div style="overflow-x: auto;">`;
+            html += `<table style="width: 100%; border-collapse: collapse;">`;
+            html += `<thead><tr style="background: ${color}; color: white;">
+                        <th style="padding: 8px; border: 1px solid #ddd; text-align: center;">Score</th>
+                        <th style="padding: 8px; border: 1px solid #ddd; text-align: center;">Avg Odds</th>
+                        <th style="padding: 8px; border: 1px solid #ddd; text-align: center;">Bookmakers</th>
+                     </tr></thead><tbody>`;
+            
+            scores.forEach(score => {
+                html += `<tr style="border-bottom: 1px solid #eee;">
+                            <td style="padding: 8px; border: 1px solid #ddd; text-align: center; font-weight: bold;">${score.score}</td>
+                            <td style="padding: 8px; border: 1px solid #ddd; text-align: center; font-weight: 600; color: #1565c0;">${score.avgOdds}</td>
+                            <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${score.bookmakers}</td>
+                         </tr>`;
+            });
+            
+            html += `</tbody></table></div>`;
+            return html;
+        }
+        
+        // FIXED: Clean Sheet Table Formatting Function - Now properly implemented!
+        function formatCleanSheetTable(cleanSheetData, color) {
+            let html = `<div style="overflow-x: auto;">`;
+            html += `<table style="width: 100%; border-collapse: collapse;">`;
+            html += `<thead><tr style="background: ${color}; color: white;">
+                        <th style="padding: 8px; border: 1px solid #ddd; text-align: center;">Option</th>
+                        <th style="padding: 8px; border: 1px solid #ddd; text-align: center;">Avg Odds</th>
+                        <th style="padding: 8px; border: 1px solid #ddd; text-align: center;">Bookmakers</th>
+                     </tr></thead><tbody>`;
+            
+            cleanSheetData.forEach(item => {
+                html += `<tr style="border-bottom: 1px solid #eee;">
+                            <td style="padding: 8px; border: 1px solid #ddd; text-align: center; font-weight: bold;">${item.option}</td>
+                            <td style="padding: 8px; border: 1px solid #ddd; text-align: center; font-weight: 600; color: #1565c0;">${item.avgOdds}</td>
+                            <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${item.bookmakers}</td>
+                         </tr>`;
+            });
+            
+            html += `</tbody></table></div>`;
+            return html;
+        }
+        
+        function formatLeaguesTable(data) {
+            if (data.error) return `<p style="color: red;">Error: ${data.error}</p>`;
+            
+            let html = `<h3>🏆 Leagues Directory (${data.totalLeagues} total, Season ${data.season})</h3>`;
+            
+            data.topCountries.forEach(country => {
+                html += `<div style="margin-bottom: 20px;">`;
+                html += `<h4 style="color: #34a853; margin-bottom: 10px;">🏴 ${country.country} (${country.leagueCount} leagues)</h4>`;
+                html += `<div style="overflow-x: auto;">`;
+                html += `<table style="width: 100%; border-collapse: collapse;">`;
+                html += `<thead><tr style="background: #34a853; color: white;">
+                            <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">League ID</th>
+                            <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">League Name</th>
+                            <th style="padding: 8px; border: 1px solid #ddd; text-align: center;">Type</th>
+                         </tr></thead><tbody>`;
+                
+                country.leagues.forEach(league => {
+                    html += `<tr style="border-bottom: 1px solid #eee;">
+                                <td style="padding: 8px; border: 1px solid #ddd; font-family: monospace; font-weight: bold; color: #1565c0;">${league.id}</td>
+                                <td style="padding: 8px; border: 1px solid #ddd; font-weight: 600;">${league.name}</td>
+                                <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${league.type}</td>
+                             </tr>`;
+                });
+                
+                html += `</tbody></table></div></div>`;
+            });
+            
+            return html;
+        }
+        
+        function hideResults(id) {
+            document.getElementById(id + 'Results').style.display = 'none';
+        }
+        
+        function showError(id, message) {
+            const element = document.getElementById(id);
+            element.textContent = 'Error: ' + message;
+            element.style.display = 'block';
+        }
+        
+        function hideError(id) {
+            document.getElementById(id + 'Error').style.display = 'none';
+        }
+        
+        function showSuccess(id, message) {
+            const element = document.getElementById(id);
+            element.textContent = message;
+            element.style.display = 'block';
+            setTimeout(() => {
+                element.style.display = 'none';
+            }, 3000);
+        }
+        
+        // Main functions
+        function getFixtures() {
+            const type = document.getElementById('fixtureType').value;
+            
+            showLoading('fixturesLoading');
+            
+            if (type === 'next') {
+                const count = document.getElementById('fixtureCount').value;
+                google.script.run
+                    .withSuccessHandler(function(result) {
+                        hideLoading('fixturesLoading');
+                        showResults('fixturesResults', result);
+                    })
+                    .withFailureHandler(function(error) {
+                        hideLoading('fixturesLoading');
+                        showError('fixturesError', error.message);
+                    })
+                    .getFixturesForWeb(count);
+            } else if (type === 'league') {
+                const leagueId = document.getElementById('leagueId').value;
+                const count = document.getElementById('leagueFixtureCount').value;
+                
+                if (!leagueId) {
+                    hideLoading('fixturesLoading');
+                    showError('fixturesError', 'Please enter a league ID');
+                    return;
+                }
+                
+                google.script.run
+                    .withSuccessHandler(function(result) {
+                        hideLoading('fixturesLoading');
+                        showResults('fixturesResults', result);
+                    })
+                    .withFailureHandler(function(error) {
+                        hideLoading('fixturesLoading');
+                        showError('fixturesError', error.message);
+                    })
+                    .getFixturesForLeagueWeb(leagueId, count);
+            } else if (type === 'date') {
+                const date = document.getElementById('fixtureDate').value;
+                
+                if (!date) {
+                    hideLoading('fixturesLoading');
+                    showError('fixturesError', 'Please select a date');
+                    return;
+                }
+                
+                google.script.run
+                    .withSuccessHandler(function(result) {
+                        hideLoading('fixturesLoading');
+                        showResults('fixturesResults', result);
+                    })
+                    .withFailureHandler(function(error) {
+                        hideLoading('fixturesLoading');
+                        showError('fixturesError', error.message);
+                    })
+                    .getFixturesForDateWeb(date);
+            }
+        }
+        
+        function getOdds() {
+            const fixtureId = document.getElementById('fixtureId').value;
+            if (!fixtureId) {
+                showError('oddsError', 'Please enter a fixture ID');
+                return;
+            }
+            
+            showLoading('oddsLoading');
+            
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    hideLoading('oddsLoading');
+                    showResults('oddsResults', result);
+                })
+                .withFailureHandler(function(error) {
+                    hideLoading('oddsLoading');
+                    showError('oddsError', error.message);
+                })
+                .getOddsForWeb(fixtureId);
+        }
+        
+        function calculateFinalScores() {
+            const fixtureId = document.getElementById('fixtureId').value;
+            if (!fixtureId) {
+                showError('oddsError', 'Please enter a fixture ID');
+                return;
+            }
+            
+            showLoading('oddsLoading');
+            
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    hideLoading('oddsLoading');
+                    showResults('oddsResults', result);
+                })
+                .withFailureHandler(function(error) {
+                    hideLoading('oddsLoading');
+                    showError('oddsError', error.message);
+                })
+                .calculateFinalScoresForWeb(fixtureId);
+        }
+        
+        function getLeagues() {
+            const season = document.getElementById('leagueSeason').value;
+            showLoading('leaguesLoading');
+            
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    hideLoading('leaguesLoading');
+                    showResults('leaguesResults', result);
+                })
+                .withFailureHandler(function(error) {
+                    hideLoading('leaguesLoading');
+                    showError('leaguesError', error.message);
+                })
+                .getLeaguesForWeb(season);
+        }
+    </script>
+</body>
+</html>
