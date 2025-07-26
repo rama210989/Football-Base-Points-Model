@@ -78,38 +78,8 @@ function getOddsForWeb(fixtureId) {
     CLEAN_SHEET_AWAY: '28'
   };
   
-  // Alternative clean sheet bet IDs to try
-  const ALTERNATIVE_CLEAN_SHEET_IDS = {
-    HOME: ['27', '29', '30', '32', '33', '34', '35', '36', '37', '38'],
-    AWAY: ['28', '29', '30', '32', '33', '34', '35', '36', '37', '38']
-  };
-  
   try {
     const results = {};
-    
-    // First, let's see what bet types are actually available
-    console.log('=== CHECKING AVAILABLE BET TYPES ===');
-    try {
-      const allBetsData = fetchAllAvailableBets(fixtureId);
-      if (allBetsData && allBetsData.bookmakers) {
-        results.availableBets = [];
-        allBetsData.bookmakers.forEach(bookmaker => {
-          if (bookmaker.bets) {
-            bookmaker.bets.forEach(bet => {
-              if (!results.availableBets.find(b => b.id === bet.id)) {
-                results.availableBets.push({
-                  id: bet.id,
-                  name: bet.name
-                });
-              }
-            });
-          }
-        });
-        console.log('Available bet types:', JSON.stringify(results.availableBets, null, 2));
-      }
-    } catch (error) {
-      console.log('Could not fetch available bet types:', error.toString());
-    }
     
     // Get Goal Scorer Data
     try {
@@ -141,62 +111,42 @@ function getOddsForWeb(fixtureId) {
       console.log('Second half score data not available: ' + error.toString());
     }
     
-    // Try multiple bet IDs for Home Clean Sheet
-    console.log('=== TRYING HOME CLEAN SHEET BET IDs ===');
-    for (let betId of ALTERNATIVE_CLEAN_SHEET_IDS.HOME) {
-      try {
-        console.log(`Trying Home Clean Sheet with bet ID: ${betId}`);
-        const cleanSheetHomeData = fetchOddsData(BASE_URL_ODDS, API_KEY, fixtureId, betId);
-        console.log(`Bet ID ${betId} response:`, JSON.stringify(cleanSheetHomeData));
-        
-        if (cleanSheetHomeData && cleanSheetHomeData.bookmakers && cleanSheetHomeData.bookmakers.length > 0) {
-          // Check if this looks like clean sheet data
-          const sampleBet = cleanSheetHomeData.bookmakers[0].bets?.[0];
-          if (sampleBet && sampleBet.name && 
-              (sampleBet.name.toLowerCase().includes('clean') || 
-               sampleBet.name.toLowerCase().includes('sheet') ||
-               sampleBet.name.toLowerCase().includes('nil') ||
-               (sampleBet.values && sampleBet.values.some(v => v.value.toLowerCase().includes('yes') || v.value.toLowerCase().includes('no'))))) {
-            
-            console.log(`Found Home Clean Sheet data with bet ID ${betId}:`, sampleBet.name);
-            results.cleanSheetHome = extractCleanSheetData(cleanSheetHomeData);
-            results.cleanSheetHomeBetId = betId;
-            results.cleanSheetHomeBetName = sampleBet.name;
-            break;
-          }
-        }
-      } catch (error) {
-        console.log(`Home Clean Sheet bet ID ${betId} failed:`, error.toString());
+    // Get Clean Sheet Home Data (Bet ID: 27)
+    console.log('=== FETCHING HOME CLEAN SHEET (BET ID: 27) ===');
+    try {
+      const cleanSheetHomeData = fetchOddsData(BASE_URL_ODDS, API_KEY, fixtureId, BETS.CLEAN_SHEET_HOME);
+      console.log('Home Clean Sheet Raw Data:', JSON.stringify(cleanSheetHomeData, null, 2));
+      
+      if (cleanSheetHomeData && cleanSheetHomeData.bookmakers && cleanSheetHomeData.bookmakers.length > 0) {
+        console.log('Processing Home Clean Sheet data...');
+        results.cleanSheetHome = extractCleanSheetData(cleanSheetHomeData);
+        console.log('Processed Home Clean Sheet:', JSON.stringify(results.cleanSheetHome, null, 2));
+      } else {
+        console.log('No Home Clean Sheet bookmakers data available');
+        results.cleanSheetHome = [];
       }
+    } catch (error) {
+      console.log('Home Clean Sheet error:', error.toString());
+      results.cleanSheetHome = [];
     }
     
-    // Try multiple bet IDs for Away Clean Sheet
-    console.log('=== TRYING AWAY CLEAN SHEET BET IDs ===');
-    for (let betId of ALTERNATIVE_CLEAN_SHEET_IDS.AWAY) {
-      try {
-        console.log(`Trying Away Clean Sheet with bet ID: ${betId}`);
-        const cleanSheetAwayData = fetchOddsData(BASE_URL_ODDS, API_KEY, fixtureId, betId);
-        console.log(`Bet ID ${betId} response:`, JSON.stringify(cleanSheetAwayData));
-        
-        if (cleanSheetAwayData && cleanSheetAwayData.bookmakers && cleanSheetAwayData.bookmakers.length > 0) {
-          // Check if this looks like clean sheet data
-          const sampleBet = cleanSheetAwayData.bookmakers[0].bets?.[0];
-          if (sampleBet && sampleBet.name && 
-              (sampleBet.name.toLowerCase().includes('clean') || 
-               sampleBet.name.toLowerCase().includes('sheet') ||
-               sampleBet.name.toLowerCase().includes('nil') ||
-               (sampleBet.values && sampleBet.values.some(v => v.value.toLowerCase().includes('yes') || v.value.toLowerCase().includes('no'))))) {
-            
-            console.log(`Found Away Clean Sheet data with bet ID ${betId}:`, sampleBet.name);
-            results.cleanSheetAway = extractCleanSheetData(cleanSheetAwayData);
-            results.cleanSheetAwayBetId = betId;
-            results.cleanSheetAwayBetName = sampleBet.name;
-            break;
-          }
-        }
-      } catch (error) {
-        console.log(`Away Clean Sheet bet ID ${betId} failed:`, error.toString());
+    // Get Clean Sheet Away Data (Bet ID: 28)
+    console.log('=== FETCHING AWAY CLEAN SHEET (BET ID: 28) ===');
+    try {
+      const cleanSheetAwayData = fetchOddsData(BASE_URL_ODDS, API_KEY, fixtureId, BETS.CLEAN_SHEET_AWAY);
+      console.log('Away Clean Sheet Raw Data:', JSON.stringify(cleanSheetAwayData, null, 2));
+      
+      if (cleanSheetAwayData && cleanSheetAwayData.bookmakers && cleanSheetAwayData.bookmakers.length > 0) {
+        console.log('Processing Away Clean Sheet data...');
+        results.cleanSheetAway = extractCleanSheetData(cleanSheetAwayData);
+        console.log('Processed Away Clean Sheet:', JSON.stringify(results.cleanSheetAway, null, 2));
+      } else {
+        console.log('No Away Clean Sheet bookmakers data available');
+        results.cleanSheetAway = [];
       }
+    } catch (error) {
+      console.log('Away Clean Sheet error:', error.toString());
+      results.cleanSheetAway = [];
     }
     
     results.fixtureId = fixtureId;
@@ -204,8 +154,8 @@ function getOddsForWeb(fixtureId) {
     
     // Log final results for debugging
     console.log('=== FINAL RESULTS ===');
-    console.log('Clean Sheet Home found:', !!results.cleanSheetHome);
-    console.log('Clean Sheet Away found:', !!results.cleanSheetAway);
+    console.log('Clean Sheet Home found:', !!results.cleanSheetHome && results.cleanSheetHome.length > 0);
+    console.log('Clean Sheet Away found:', !!results.cleanSheetAway && results.cleanSheetAway.length > 0);
     console.log('Final results object:', JSON.stringify(results, null, 2));
     
     return results;
@@ -498,31 +448,7 @@ function fetchLeaguesData(baseUrl, apiKey, params) {
   return data;
 }
 
-// New function to fetch all available bet types for a fixture
-function fetchAllAvailableBets(fixtureId) {
-  const url = `${BASE_URL_ODDS}?fixture=${fixtureId}`;
-  
-  const options = {
-    'method': 'GET',
-    'headers': {
-      'x-rapidapi-host': 'api-football-v1.p.rapidapi.com',
-      'x-rapidapi-key': API_KEY
-    }
-  };
-  
-  console.log('Fetching all available bets from URL: ' + url);
-  
-  const response = UrlFetchApp.fetch(url, options);
-  const data = JSON.parse(response.getContentText());
-  
-  console.log('All available bets response:', JSON.stringify(data));
-  
-  if (data.errors && data.errors.length > 0) {
-    throw new Error('API Error: ' + data.errors.join(', '));
-  }
-  
-  return data.response && data.response.length > 0 ? data.response[0] : null;
-}
+
 
 // =============================================================================
 // DATA PROCESSING FUNCTIONS

@@ -463,25 +463,10 @@
                 html += `</div>`;
             }
             
-            // Available Bet Types (Debug Info)
-            if (data.availableBets && data.availableBets.length > 0) {
-                html += `<div style="margin-bottom: 20px;">`;
-                html += `<h4 style="color: #6c757d; margin-bottom: 10px;">🔍 Available Bet Types (Debug)</h4>`;
-                html += `<div style="background: #f8f9fa; padding: 10px; border-radius: 5px; font-size: 12px;">`;
-                data.availableBets.forEach(bet => {
-                    html += `<span style="display: inline-block; margin: 2px; padding: 2px 6px; background: #e9ecef; border-radius: 3px;">ID: ${bet.id} - ${bet.name}</span>`;
-                });
-                html += `</div></div>`;
-            }
-            
             // Clean Sheet Home Section
             if (data.cleanSheetHome && data.cleanSheetHome.length > 0) {
                 html += `<div style="margin-bottom: 20px;">`;
-                let title = `🥅 Home Team Clean Sheet`;
-                if (data.cleanSheetHomeBetName) {
-                    title += ` (${data.cleanSheetHomeBetName} - ID: ${data.cleanSheetHomeBetId})`;
-                }
-                html += `<h4 style="color: #9b59b6; margin-bottom: 10px;">${title}</h4>`;
+                html += `<h4 style="color: #9b59b6; margin-bottom: 10px;">🥅 Home Team Clean Sheet</h4>`;
                 html += formatCleanSheetTable(data.cleanSheetHome, '#9b59b6');
                 html += `</div>`;
             }
@@ -489,11 +474,7 @@
             // Clean Sheet Away Section
             if (data.cleanSheetAway && data.cleanSheetAway.length > 0) {
                 html += `<div style="margin-bottom: 20px;">`;
-                let title = `🥅 Away Team Clean Sheet`;
-                if (data.cleanSheetAwayBetName) {
-                    title += ` (${data.cleanSheetAwayBetName} - ID: ${data.cleanSheetAwayBetId})`;
-                }
-                html += `<h4 style="color: #e67e22; margin-bottom: 10px;">${title}</h4>`;
+                html += `<h4 style="color: #e67e22; margin-bottom: 10px;">🥅 Away Team Clean Sheet</h4>`;
                 html += formatCleanSheetTable(data.cleanSheetAway, '#e67e22');
                 html += `</div>`;
             }
